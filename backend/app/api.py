@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from .models import Receipt, ReceiptItem, ReceiptVat
 from .analytics.products import list_products as product_list
-from .analytics.products import merge_products, product_analytics, top_products
+from .analytics.products import merge_products, product_analytics, rename_product, top_products
 from .services.importer import ReceiptImportError, ReceiptImportService
 
 router = APIRouter(prefix="/api")
@@ -19,6 +19,10 @@ router = APIRouter(prefix="/api")
 
 class ProductMergeRequest(BaseModel):
     target_product_id: int
+
+
+class ProductRenameRequest(BaseModel):
+    name: str
 
 
 def _money(value: Decimal | None) -> str | None:
@@ -176,6 +180,22 @@ def merge_product(
     if merged is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     return merged
+
+
+@router.post("/products/{product_id}/rename", tags=["products"])
+def rename_product_endpoint(
+    product_id: int,
+    payload: ProductRenameRequest,
+    request: Request,
+) -> dict[str, object]:
+    try:
+        with request.app.state.session_factory() as session:
+            renamed = rename_product(session, product_id, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if renamed is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return renamed
 
 
 @router.get("/analytics/products/top", tags=["analytics"])

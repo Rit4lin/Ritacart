@@ -116,6 +116,25 @@ def merge_products(session: Session, source_product_id: int, target_product_id: 
     return {"source_name": source_name, "target_name": target_name, "product_id": target.id}
 
 
+def rename_product(session: Session, product_id: int, name: str) -> dict[str, object] | None:
+    canonical_name = " ".join(name.split())
+    if not canonical_name:
+        raise ValueError("El nombre del producto no puede estar vacío")
+    if len(canonical_name) > 255:
+        raise ValueError("El nombre del producto no puede superar 255 caracteres")
+    product = session.get(Product, product_id)
+    if product is None:
+        return None
+    existing = session.scalar(
+        select(Product).where(Product.name == canonical_name, Product.id != product.id)
+    )
+    if existing is not None:
+        raise ValueError("Ya existe otro producto con ese nombre")
+    product.name = canonical_name
+    session.commit()
+    return {"product_id": product.id, "name": product.name}
+
+
 def _observed_price(item: ReceiptItem) -> tuple[Decimal | None, str]:
     if item.price_per_kg is not None:
         return item.price_per_kg, "€/kg"

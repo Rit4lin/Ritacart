@@ -247,6 +247,7 @@ Configuración lo indica sin exponer la contraseña.
 - `GET /api/products`
 - `GET /api/products/{id}/analytics`
 - `POST /api/products/{id}/merge`
+- `POST /api/products/{id}/rename`
 - `GET /api/analytics/products/top`
 - `GET /api/import/status`
 - `POST /api/import/run`
@@ -265,6 +266,10 @@ que diferencias de peso entre bandejas oculten la subida de precio observada.
 En **Productos** también se pueden unir manualmente dos productos. El nombre
 del ticket se conserva como alias y las observaciones históricas pasan al
 producto elegido como destino.
+
+También se puede cambiar el nombre mostrado de un producto. Los nombres
+originales del ticket no se modifican: permanecen como alias y cualquier compra
+futura con uno de ellos se asigna automáticamente al nombre elegido.
 
 ## Limitaciones actuales del parser
 

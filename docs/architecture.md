@@ -207,6 +207,7 @@ GET /api/products/{id}
 GET /api/products/{id}/history
 GET /api/products/{id}/analytics
 POST /api/products/{id}/merge
+POST /api/products/{id}/rename
 GET /api/analytics/products/top
 GET /api/analytics/overview
 GET /api/analytics/spend
