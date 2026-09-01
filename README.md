@@ -121,4 +121,19 @@ La primera versión útil deberá poder:
 
 ## Estado
 
-Proyecto en fase inicial de diseño y desarrollo.
+Fase inicial implementada: FastAPI sirve una API de salud y el frontend React
+compilado. La importación de correo/PDF, el parser, la autenticación y las
+estadísticas aún no forman parte de esta fase.
+
+## Arranque
+
+Se necesita Docker Compose. Desde la raíz del repositorio:
+
+```bash
+docker compose up --build
+```
+
+Abre `http://localhost:8000`. La página inicial consulta `GET /api/health`; una
+respuesta correcta es `{"status":"ok"}`. El directorio local `./data` se monta
+como `/data` en el contenedor y contiene la base SQLite (`ritacart.db`) y la
+carpeta reservada para tickets (`receipts/`).

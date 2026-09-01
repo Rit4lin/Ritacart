@@ -1,0 +1,1 @@
+"""RitaCart backend package."""
