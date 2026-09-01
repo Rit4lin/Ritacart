@@ -16,7 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..config import Settings
-from ..models import Product, ProductAlias, Receipt, ReceiptItem, Store
+from ..models import Product, ProductAlias, Receipt, ReceiptItem, ReceiptVat, Store
+from ..parsers.base import ParsedReceiptItem, ParsedReceiptVat
 from ..parsers.mercadona import MercadonaParser
 from .pdf import PdfExtractionError, extract_text
 
@@ -111,19 +112,8 @@ class ReceiptImportService:
             )
             session.add(receipt)
             for item in parsed.items:
-                product = self._get_or_create_product(session, store, item.raw_name)
-                receipt.items.append(
-                    ReceiptItem(
-                        product=product,
-                        raw_name=item.raw_name,
-                        quantity=item.quantity,
-                        unit=item.unit,
-                        unit_price=item.unit_price,
-                        price_per_kg=item.price_per_kg,
-                        total_price=item.total_price,
-                        raw_text=item.raw_text,
-                    )
-                )
+                self._append_item(session, receipt, store, item)
+            self._append_vat_breakdown(receipt, parsed.vat_breakdown)
             try:
                 session.commit()
             except IntegrityError:
@@ -136,6 +126,32 @@ class ReceiptImportService:
             return ImportResult(
                 receipt.id, imported=True, duplicate=False, warnings=parsed.warnings
             )
+
+    def reprocess_receipt(self, receipt_id: int) -> ImportResult:
+        """Rebuild normalized observations from the preserved extracted receipt text."""
+        with self.session_factory() as session:
+            receipt = session.get(Receipt, receipt_id)
+            if receipt is None:
+                raise ReceiptImportError("Ticket no encontrado")
+            if not receipt.source_extracted_text:
+                raise ReceiptImportError("El ticket no conserva texto extraído para reprocesarlo")
+            try:
+                parsed = self.parser.parse(receipt.source_extracted_text)
+            except ValueError as exc:
+                raise ReceiptImportError(str(exc)) from exc
+
+            receipt.purchased_at = parsed.purchased_at
+            receipt.total = parsed.total
+            receipt.parser_warnings = json.dumps(parsed.warnings, ensure_ascii=False)
+            receipt.items.clear()
+            receipt.vat_breakdown.clear()
+            session.flush()
+            store = receipt.store
+            for item in parsed.items:
+                self._append_item(session, receipt, store, item)
+            self._append_vat_breakdown(receipt, parsed.vat_breakdown)
+            session.commit()
+            return ImportResult(receipt.id, imported=True, duplicate=False, warnings=parsed.warnings)
 
     def run_imap_import(self) -> int:
         """Fetch configured Mercadona PDF attachments once, without marking mail read."""
@@ -251,6 +267,39 @@ class ReceiptImportService:
             session.flush()
         session.add(ProductAlias(store=store, raw_name=raw_name, product=product))
         return product
+
+    def _append_item(
+        self,
+        session: Session,
+        receipt: Receipt,
+        store: Store,
+        item: ParsedReceiptItem,
+    ) -> None:
+        product = self._get_or_create_product(session, store, item.raw_name)
+        receipt.items.append(
+            ReceiptItem(
+                product=product,
+                raw_name=item.raw_name,
+                quantity=item.quantity,
+                unit=item.unit,
+                unit_price=item.unit_price,
+                price_per_kg=item.price_per_kg,
+                total_price=item.total_price,
+                raw_text=item.raw_text,
+            )
+        )
+
+    @staticmethod
+    def _append_vat_breakdown(receipt: Receipt, vat_breakdown: list[ParsedReceiptVat]) -> None:
+        for vat in vat_breakdown:
+            receipt.vat_breakdown.append(
+                ReceiptVat(
+                    rate=vat.rate,
+                    taxable_base=vat.taxable_base,
+                    tax_amount=vat.tax_amount,
+                    raw_text=vat.raw_text,
+                )
+            )
 
     def _set_status(self, **values: object) -> None:
         with self._status_lock:

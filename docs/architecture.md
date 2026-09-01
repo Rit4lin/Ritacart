@@ -83,6 +83,7 @@ Suggested fields:
 - store_id
 - purchased_at
 - total
+- VAT breakdown by rate (taxable base and tax amount when present on the ticket)
 - source_message_id
 - source_file_hash
 - source_filename
@@ -195,6 +196,7 @@ Example endpoints, subject to implementation refinement:
 GET /api/health
 GET /api/receipts
 GET /api/receipts/{id}
+POST /api/receipts/{id}/reprocess
 GET /api/products
 GET /api/products/{id}
 GET /api/products/{id}/history

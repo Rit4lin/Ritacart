@@ -242,6 +242,7 @@ Configuración lo indica sin exponer la contraseña.
 - `GET /api/overview`
 - `GET /api/receipts`
 - `GET /api/receipts/{id}`
+- `POST /api/receipts/{id}/reprocess`
 - `POST /api/receipts/import` (campo multipart `file`)
 - `GET /api/import/status`
 - `POST /api/import/run`
@@ -249,6 +250,7 @@ Configuración lo indica sin exponer la contraseña.
 ## Limitaciones actuales del parser
 
 El parser reconoce de forma determinista líneas unitarias y pesadas habituales
-de Mercadona. Conserva avisos para líneas que no pueda interpretar, pero otros
-formatos de ticket, descuentos complejos y cambios de maquetación requerirán
-nuevas fixtures y reglas de parser antes de soportarse.
+de Mercadona, incluidos los PDF cuya extracción de texto separa las columnas en
+líneas distintas. Conserva el desglose de IVA que figure en el ticket y avisos
+para líneas que no pueda interpretar. Descuentos complejos y cambios de
+maquetación requerirán nuevas fixtures y reglas antes de soportarse.

@@ -43,6 +43,9 @@ class Receipt(Base):
     items: Mapped[list[ReceiptItem]] = relationship(
         back_populates="receipt", cascade="all, delete-orphan"
     )
+    vat_breakdown: Mapped[list[ReceiptVat]] = relationship(
+        back_populates="receipt", cascade="all, delete-orphan"
+    )
 
 
 class Product(Base):
@@ -84,3 +87,17 @@ class ReceiptItem(Base):
 
     receipt: Mapped[Receipt] = relationship(back_populates="items")
     product: Mapped[Optional[Product]] = relationship(back_populates="receipt_items")
+
+
+class ReceiptVat(Base):
+    __tablename__ = "receipt_vat"
+    __table_args__ = (UniqueConstraint("receipt_id", "rate", name="uq_receipt_vat_rate"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    receipt_id: Mapped[int] = mapped_column(ForeignKey("receipts.id"), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    taxable_base: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    tax_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    receipt: Mapped[Receipt] = relationship(back_populates="vat_breakdown")

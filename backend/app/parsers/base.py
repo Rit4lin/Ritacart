@@ -17,10 +17,19 @@ class ParsedReceiptItem:
 
 
 @dataclass(frozen=True)
+class ParsedReceiptVat:
+    rate: Decimal
+    taxable_base: Decimal
+    tax_amount: Decimal
+    raw_text: str
+
+
+@dataclass(frozen=True)
 class ParsedReceipt:
     purchased_at: datetime
     total: Decimal
     items: list[ParsedReceiptItem]
+    vat_breakdown: list[ParsedReceiptVat] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
 

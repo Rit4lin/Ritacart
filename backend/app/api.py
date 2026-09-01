@@ -8,7 +8,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from .models import Receipt, ReceiptItem
+from .models import Receipt, ReceiptItem, ReceiptVat
 from .services.importer import ReceiptImportError, ReceiptImportService
 
 router = APIRouter(prefix="/api")
@@ -32,6 +32,14 @@ def _item_payload(item: ReceiptItem) -> dict[str, object]:
     }
 
 
+def _vat_payload(vat: ReceiptVat) -> dict[str, object]:
+    return {
+        "rate": _money(vat.rate),
+        "taxable_base": _money(vat.taxable_base),
+        "tax_amount": _money(vat.tax_amount),
+    }
+
+
 def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object]:
     payload: dict[str, object] = {
         "id": receipt.id,
@@ -44,6 +52,7 @@ def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object
     }
     if detail:
         payload["items"] = [_item_payload(item) for item in receipt.items]
+        payload["vat_breakdown"] = [_vat_payload(vat) for vat in receipt.vat_breakdown]
         payload["parser_warnings"] = json.loads(receipt.parser_warnings or "[]")
     return payload
 
@@ -105,12 +114,30 @@ def get_receipt(receipt_id: int, request: Request) -> dict[str, object]:
     with request.app.state.session_factory() as session:
         receipt = session.scalar(
             select(Receipt)
-            .options(selectinload(Receipt.items), selectinload(Receipt.store))
+            .options(
+                selectinload(Receipt.items),
+                selectinload(Receipt.store),
+                selectinload(Receipt.vat_breakdown),
+            )
             .where(Receipt.id == receipt_id)
         )
         if receipt is None:
             raise HTTPException(status_code=404, detail="Ticket no encontrado")
         return _receipt_payload(receipt, detail=True)
+
+
+@router.post("/receipts/{receipt_id}/reprocess", tags=["receipts"])
+def reprocess_receipt(receipt_id: int, request: Request) -> dict[str, object]:
+    try:
+        result = _importer(request).reprocess_receipt(receipt_id)
+    except ReceiptImportError as exc:
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if str(exc) == "Ticket no encontrado"
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return {"receipt_id": result.receipt_id, "warnings": result.warnings}
 
 
 @router.get("/overview", tags=["overview"])
