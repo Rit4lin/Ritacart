@@ -173,7 +173,52 @@ FastAPI en `http://localhost:8000`. Para validar antes de trabajar, ejecuta
 `cd backend; ..\.venv\Scripts\python -m pytest tests -q` y
 `cd frontend; npm run build`.
 
-## Configurar Gmail en Docker o Unraid
+## Desplegar en Unraid desde GHCR
+
+Al fusionar cambios en `main`, GitHub Actions publica la imagen multi-arquitectura
+en `ghcr.io/rit4lin/ritacart:latest`. Las etiquetas Git `v*` también generan una
+imagen versionada. La publicación usa el `GITHUB_TOKEN` de Actions; no requiere
+guardar un token de registro en el repositorio.
+
+Después de la primera publicación, comprueba en GitHub, en la sección
+**Packages**, que `ritacart` sea pública. Así Unraid puede descargarla sin
+credenciales de GitHub.
+
+En la GUI de Unraid, ve a **Docker → Add Container** y crea esta plantilla:
+
+| Campo | Valor |
+| --- | --- |
+| Name | `ritacart` |
+| Repository | `ghcr.io/rit4lin/ritacart:latest` |
+| Network Type | `bridge` |
+| Host Port | `8000` |
+| Container Port | `8000` |
+| Host Path | `/mnt/user/appdata/ritacart/data` |
+| Container Path | `/data` |
+| Access Mode | `Read/Write` |
+
+Añade estas variables de entorno desde la misma plantilla:
+
+```text
+APP_DATA_DIR=/data
+DATABASE_URL=sqlite:////data/ritacart.db
+APP_TIMEZONE=Europe/Madrid
+EMAIL_HOST=imap.gmail.com
+EMAIL_PORT=993
+EMAIL_USE_SSL=true
+EMAIL_USERNAME=tu-cuenta@gmail.com
+EMAIL_PASSWORD=tu-contraseña-de-aplicación
+EMAIL_FOLDER=INBOX
+EMAIL_RECEIPT_SENDER=ticket_digital@mail.mercadona.com
+EMAIL_POLL_INTERVAL_MINUTES=15
+```
+
+Activa **Auto Start** y abre `http://IP_DE_UNRAID:8000`. Para actualizar,
+usa **Docker → Check for Updates** y aplica la actualización de `ritacart`;
+el volumen `/mnt/user/appdata/ritacart/data` conserva la base de datos y los
+PDFs. No expongas el puerto 8000 a Internet: RitaCart no tiene autenticación.
+
+## Configurar Gmail con Docker Compose
 
 1. Copia `.env.example` como `.env` junto a `docker-compose.yml`.
 2. Rellena `EMAIL_USERNAME` y `EMAIL_PASSWORD`. Para Gmail, utiliza una
