@@ -16,6 +16,44 @@ TOTAL 3,25
 """
 
 
+COLUMN_LAYOUT_RECEIPT_TEXT = """MERCADONA
+01/08/2026 14:30
+Descripción
+P. Unit
+Importe
+1 BEBIDA VEGETAL
+6,60
+2 REFRESCO SIN AZÚCAR
+0,95
+1,90
+1 QUESO FRESCO
+2,61
+1 PERA DE TEMPORADA
+0,490 kg
+2,75 €/kg
+1,35
+TOTAL (€)
+12,46
+TARJETA BANCARIA
+12,46
+IVA
+BASE IMPONIBLE (€)
+CUOTA (€)
+4%
+2,50
+0,10
+10%
+5,00
+0,50
+21%
+3,60
+0,76
+TOTAL
+11,10
+1,36
+"""
+
+
 def make_pdf(text: str = RECEIPT_TEXT) -> bytes:
     document = fitz.open()
     page = document.new_page()

@@ -236,19 +236,40 @@ imagen o en Git. Si `EMAIL_USERNAME` o `EMAIL_PASSWORD` están vacíos, RitaCart
 arranca con normalidad y la importación automática queda desactivada. La página
 Configuración lo indica sin exponer la contraseña.
 
-## API inicial
+## API
 
 - `GET /api/health`
 - `GET /api/overview`
 - `GET /api/receipts`
 - `GET /api/receipts/{id}`
+- `POST /api/receipts/{id}/reprocess`
 - `POST /api/receipts/import` (campo multipart `file`)
+- `GET /api/products`
+- `GET /api/products/{id}/analytics`
+- `POST /api/products/{id}/merge`
+- `GET /api/analytics/products/top`
 - `GET /api/import/status`
 - `POST /api/import/run`
+
+## Analítica de productos
+
+La página **Productos** muestra por producto el número de compras, la cantidad
+acumulada, las compras por mes, el patrón por mes del año y la evolución de
+precios. Una compra es un ticket distinto que contiene el producto; comprar dos
+bandejas en el mismo ticket cuenta como una compra y dos unidades.
+
+Cuando un producto aparece varias veces el mismo día con precios diferentes, el
+histórico conserva el precio más alto de ese día y unidad de medida. Esto evita
+que diferencias de peso entre bandejas oculten la subida de precio observada.
+
+En **Productos** también se pueden unir manualmente dos productos. El nombre
+del ticket se conserva como alias y las observaciones históricas pasan al
+producto elegido como destino.
 
 ## Limitaciones actuales del parser
 
 El parser reconoce de forma determinista líneas unitarias y pesadas habituales
-de Mercadona. Conserva avisos para líneas que no pueda interpretar, pero otros
-formatos de ticket, descuentos complejos y cambios de maquetación requerirán
-nuevas fixtures y reglas de parser antes de soportarse.
+de Mercadona, incluidos los PDF cuya extracción de texto separa las columnas en
+líneas distintas. Conserva el desglose de IVA que figure en el ticket y avisos
+para líneas que no pueda interpretar. Descuentos complejos y cambios de
+maquetación requerirán nuevas fixtures y reglas antes de soportarse.
