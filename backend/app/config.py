@@ -26,7 +26,8 @@ class Settings:
 
 def get_settings() -> Settings:
     """Load the small set of configuration values needed by this phase."""
-    data_dir = Path(os.getenv("APP_DATA_DIR", "/data"))
+    default_data_dir = Path(__file__).resolve().parents[2] / "data"
+    data_dir = Path(os.getenv("APP_DATA_DIR", str(default_data_dir)))
     database_url = os.getenv(
         "DATABASE_URL", f"sqlite:///{data_dir.as_posix()}/ritacart.db"
     )

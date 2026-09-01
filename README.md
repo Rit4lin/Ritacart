@@ -138,6 +138,41 @@ Abre `http://localhost:8000`. El directorio local `./data` se monta como
 `/data` en el contenedor y contiene la base SQLite (`ritacart.db`) y los PDFs
 originales (`receipts/`).
 
+## Preparar otro PC para desarrollo
+
+El repositorio incluye `AGENTS.md`, la arquitectura y todas las dependencias
+declaradas; no hace falta copiar archivos generados, `.venv`, `node_modules`,
+`data/` ni `.env`.
+
+```bash
+git clone https://github.com/Rit4lin/Ritacart.git
+cd Ritacart
+copy .env.example .env
+```
+
+Instala Python 3.13 o posterior, Node.js 22 o posterior y Docker Desktop. Para
+desarrollo local, crea el entorno Python y ejecuta ambos procesos:
+
+```bash
+python -m venv .venv
+.venv\Scripts\python -m pip install -r backend\requirements-dev.txt
+cd backend
+..\.venv\Scripts\python -m uvicorn app.main:app --reload
+```
+
+En otra terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Vite publica la interfaz en `http://localhost:5173` y redirige `/api` a
+FastAPI en `http://localhost:8000`. Para validar antes de trabajar, ejecuta
+`cd backend; ..\.venv\Scripts\python -m pytest tests -q` y
+`cd frontend; npm run build`.
+
 ## Configurar Gmail en Docker o Unraid
 
 1. Copia `.env.example` como `.env` junto a `docker-compose.yml`.
