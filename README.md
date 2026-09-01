@@ -55,7 +55,7 @@ Los tickets digitales de Mercadona contienen texto, por lo que el objetivo inici
 
 ### Backend
 
-- Python 3.13
+- Python 3.14
 - FastAPI
 - SQLAlchemy
 - PyMuPDF para extracción de texto de PDF
@@ -150,7 +150,7 @@ cd Ritacart
 copy .env.example .env
 ```
 
-Instala Python 3.13 o posterior, Node.js 22 o posterior y Docker Desktop. Para
+Instala Python 3.14 o posterior, Node.js 24 LTS o posterior y Docker Desktop. Para
 desarrollo local, crea el entorno Python y ejecuta ambos procesos:
 
 ```bash
@@ -175,10 +175,11 @@ FastAPI en `http://localhost:8000`. Para validar antes de trabajar, ejecuta
 
 ## Desplegar en Unraid desde GHCR
 
-Al fusionar cambios en `main`, GitHub Actions publica la imagen multi-arquitectura
-en `ghcr.io/rit4lin/ritacart:latest`. Las etiquetas Git `v*` también generan una
-imagen versionada. La publicación usa el `GITHUB_TOKEN` de Actions; no requiere
-guardar un token de registro en el repositorio.
+Al fusionar cambios en `main`, GitHub Actions publica una imagen `linux/amd64`
+en `ghcr.io/rit4lin/ritacart:latest`, adecuada para Unraid en hardware
+Intel/AMD. Las etiquetas Git `v*` también generan una imagen versionada. La
+publicación usa el `GITHUB_TOKEN` de Actions; no requiere guardar un token de
+registro en el repositorio.
 
 Después de la primera publicación, comprueba en GitHub, en la sección
 **Packages**, que `ritacart` sea pública. Así Unraid puede descargarla sin
