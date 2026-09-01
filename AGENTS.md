@@ -22,7 +22,7 @@ Keep the product intentionally small.
 ## Planned stack
 
 Backend:
-- Python 3.13
+- Python 3.14
 - FastAPI
 - SQLAlchemy
 - PyMuPDF

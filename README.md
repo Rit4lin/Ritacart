@@ -55,7 +55,7 @@ Los tickets digitales de Mercadona contienen texto, por lo que el objetivo inici
 
 ### Backend
 
-- Python 3.13
+- Python 3.14
 - FastAPI
 - SQLAlchemy
 - PyMuPDF para extracción de texto de PDF
@@ -150,7 +150,7 @@ cd Ritacart
 copy .env.example .env
 ```
 
-Instala Python 3.13 o posterior, Node.js 22 o posterior y Docker Desktop. Para
+Instala Python 3.14 o posterior, Node.js 24 LTS o posterior y Docker Desktop. Para
 desarrollo local, crea el entorno Python y ejecuta ambos procesos:
 
 ```bash

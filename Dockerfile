@@ -1,11 +1,11 @@
-FROM node:22-alpine AS frontend-build
+FROM node:24-alpine AS frontend-build
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 ENV APP_DATA_DIR=/data \
     DATABASE_URL=sqlite:////data/ritacart.db \
     APP_TIMEZONE=Europe/Madrid \
