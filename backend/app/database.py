@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator
-
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import Settings
@@ -30,18 +28,16 @@ def create_database_engine(settings: Settings) -> Engine:
 
 
 def initialise_database(engine: Engine) -> None:
-    """Create the initial schema when the app starts.
-
-    There are no receipt models in this phase yet; this keeps the database
-    lifecycle in place without inventing premature domain tables.
-    """
+    """Create the schema and apply the one additive compatibility change so far."""
     Base.metadata.create_all(bind=engine)
-
+    inspector = inspect(engine)
+    if "receipts" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("receipts")}
+        if "source_extracted_text" not in columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE receipts ADD COLUMN source_extracted_text TEXT NOT NULL DEFAULT ''")
+                )
 
 def get_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
-
-def session_scope(factory: sessionmaker[Session]) -> Generator[Session, None, None]:
-    with factory() as session:
-        yield session

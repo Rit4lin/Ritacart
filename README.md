@@ -121,9 +121,10 @@ La primera versión útil deberá poder:
 
 ## Estado
 
-Fase inicial implementada: FastAPI sirve una API de salud y el frontend React
-compilado. La importación de correo/PDF, el parser, la autenticación y las
-estadísticas aún no forman parte de esta fase.
+RitaCart importa tickets digitales de Mercadona desde Gmail/IMAP o mediante un
+PDF cargado manualmente. Conserva el PDF original, el texto/líneas originales y
+los datos normalizados en SQLite. No incluye autenticación, OCR ni analítica
+avanzada.
 
 ## Arranque
 
@@ -133,7 +134,40 @@ Se necesita Docker Compose. Desde la raíz del repositorio:
 docker compose up --build
 ```
 
-Abre `http://localhost:8000`. La página inicial consulta `GET /api/health`; una
-respuesta correcta es `{"status":"ok"}`. El directorio local `./data` se monta
-como `/data` en el contenedor y contiene la base SQLite (`ritacart.db`) y la
-carpeta reservada para tickets (`receipts/`).
+Abre `http://localhost:8000`. El directorio local `./data` se monta como
+`/data` en el contenedor y contiene la base SQLite (`ritacart.db`) y los PDFs
+originales (`receipts/`).
+
+## Configurar Gmail en Docker o Unraid
+
+1. Copia `.env.example` como `.env` junto a `docker-compose.yml`.
+2. Rellena `EMAIL_USERNAME` y `EMAIL_PASSWORD`. Para Gmail, utiliza una
+   [contraseña de aplicación](https://support.google.com/accounts/answer/185833)
+   con la verificación en dos pasos activada; no uses tu contraseña habitual.
+3. Conserva `EMAIL_USE_SSL=true`, configura el remitente esperado y ajusta el
+   intervalo si hace falta. El valor predeterminado busca
+   `ticket_digital@mail.mercadona.com` cada 15 minutos.
+4. Ejecuta `docker compose up --build -d`.
+
+En Unraid, usa el mismo directorio de aplicación como contexto de Compose y
+guarda estas variables como secretos/configuración del despliegue, nunca en la
+imagen o en Git. Si `EMAIL_USERNAME` o `EMAIL_PASSWORD` están vacíos, RitaCart
+arranca con normalidad y la importación automática queda desactivada. La página
+Configuración lo indica sin exponer la contraseña.
+
+## API inicial
+
+- `GET /api/health`
+- `GET /api/overview`
+- `GET /api/receipts`
+- `GET /api/receipts/{id}`
+- `POST /api/receipts/import` (campo multipart `file`)
+- `GET /api/import/status`
+- `POST /api/import/run`
+
+## Limitaciones actuales del parser
+
+El parser reconoce de forma determinista líneas unitarias y pesadas habituales
+de Mercadona. Conserva avisos para líneas que no pueda interpretar, pero otros
+formatos de ticket, descuentos complejos y cambios de maquetación requerirán
+nuevas fixtures y reglas de parser antes de soportarse.

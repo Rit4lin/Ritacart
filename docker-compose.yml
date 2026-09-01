@@ -8,6 +8,14 @@ services:
       APP_DATA_DIR: /data
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Madrid}
       DATABASE_URL: sqlite:////data/ritacart.db
+      EMAIL_HOST: ${EMAIL_HOST:-imap.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-993}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-true}
+      EMAIL_USERNAME: ${EMAIL_USERNAME:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_FOLDER: ${EMAIL_FOLDER:-INBOX}
+      EMAIL_RECEIPT_SENDER: ${EMAIL_RECEIPT_SENDER:-ticket_digital@mail.mercadona.com}
+      EMAIL_POLL_INTERVAL_MINUTES: ${EMAIL_POLL_INTERVAL_MINUTES:-15}
     volumes:
       - ./data:/data
     restart: unless-stopped
