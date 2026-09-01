@@ -84,3 +84,29 @@ TOTAL 5,20
             "last_purchased_at": "2026-02-10T10:00:00",
         },
     ]
+
+    renamed = client.post(
+        f"/api/products/{product_ids['POLLO DESHUESA']}/rename",
+        json={"name": "POLLO DESHUESADO"},
+    )
+    assert renamed.status_code == 200
+    assert renamed.json() == {
+        "product_id": product_ids["POLLO DESHUESA"],
+        "name": "POLLO DESHUESADO",
+    }
+
+    _import_receipt(
+        client,
+        """MERCADONA
+12/04/2026 10:00
+1 POLLO DESHUESA 5,50 5,50
+TOTAL 5,50
+""",
+    )
+    products_after_rename = client.get("/api/products").json()
+    renamed_product = next(
+        product for product in products_after_rename if product["id"] == product_ids["POLLO DESHUESA"]
+    )
+    assert renamed_product["name"] == "POLLO DESHUESADO"
+    assert renamed_product["purchase_count"] == 4
+    assert "POLLO DESHUESA" not in {product["name"] for product in products_after_rename}
