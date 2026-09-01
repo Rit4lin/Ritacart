@@ -1,0 +1,13 @@
+services:
+  ritacart:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_DATA_DIR: /data
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Madrid}
+      DATABASE_URL: sqlite:////data/ritacart.db
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
