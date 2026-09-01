@@ -186,6 +186,11 @@ Initial analytics:
 - current vs previous price
 - minimum/maximum/average observed price
 
+Product price history is derived from `ReceiptItem` observations. For a given
+product, calendar date and price unit, use the maximum observed price when more
+than one item is present on that date. This prevents small weight differences
+between packages from masking the highest observed daily price.
+
 A purchase occasion is not the same as quantity. Buying 6 units in one receipt counts as one purchase occasion and 6 units.
 
 ## API direction
@@ -200,6 +205,9 @@ POST /api/receipts/{id}/reprocess
 GET /api/products
 GET /api/products/{id}
 GET /api/products/{id}/history
+GET /api/products/{id}/analytics
+POST /api/products/{id}/merge
+GET /api/analytics/products/top
 GET /api/analytics/overview
 GET /api/analytics/spend
 GET /api/analytics/shopping-times

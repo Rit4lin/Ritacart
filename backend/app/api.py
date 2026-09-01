@@ -5,13 +5,20 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from .models import Receipt, ReceiptItem, ReceiptVat
+from .analytics.products import list_products as product_list
+from .analytics.products import merge_products, product_analytics, top_products
 from .services.importer import ReceiptImportError, ReceiptImportService
 
 router = APIRouter(prefix="/api")
+
+
+class ProductMergeRequest(BaseModel):
+    target_product_id: int
 
 
 def _money(value: Decimal | None) -> str | None:
@@ -138,6 +145,43 @@ def reprocess_receipt(receipt_id: int, request: Request) -> dict[str, object]:
         )
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return {"receipt_id": result.receipt_id, "warnings": result.warnings}
+
+
+@router.get("/products", tags=["products"])
+def list_products(request: Request) -> list[dict[str, object]]:
+    with request.app.state.session_factory() as session:
+        return product_list(session)
+
+
+@router.get("/products/{product_id}/analytics", tags=["products"])
+def get_product_analytics(product_id: int, request: Request) -> dict[str, object]:
+    with request.app.state.session_factory() as session:
+        analytics = product_analytics(session, product_id)
+        if analytics is None:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        return analytics
+
+
+@router.post("/products/{product_id}/merge", tags=["products"])
+def merge_product(
+    product_id: int,
+    payload: ProductMergeRequest,
+    request: Request,
+) -> dict[str, object]:
+    try:
+        with request.app.state.session_factory() as session:
+            merged = merge_products(session, product_id, payload.target_product_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if merged is None:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return merged
+
+
+@router.get("/analytics/products/top", tags=["analytics"])
+def get_top_products(request: Request) -> list[dict[str, object]]:
+    with request.app.state.session_factory() as session:
+        return top_products(session)
 
 
 @router.get("/overview", tags=["overview"])

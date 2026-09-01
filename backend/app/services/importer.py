@@ -266,6 +266,7 @@ class ReceiptImportService:
             session.add(product)
             session.flush()
         session.add(ProductAlias(store=store, raw_name=raw_name, product=product))
+        session.flush()
         return product
 
     def _append_item(
