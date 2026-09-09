@@ -202,18 +202,53 @@ GET /api/health
 GET /api/receipts
 GET /api/receipts/{id}
 POST /api/receipts/{id}/reprocess
+GET /api/receipts/{id}/pdf
+PATCH /api/receipts/{id}/items/{item_id}
+POST /api/receipts/import
 GET /api/products
-GET /api/products/{id}
-GET /api/products/{id}/history
 GET /api/products/{id}/analytics
 POST /api/products/{id}/merge
 POST /api/products/{id}/rename
 GET /api/analytics/products/top
-GET /api/analytics/overview
-GET /api/analytics/spend
-GET /api/analytics/shopping-times
+GET /api/analytics/products/insights
+GET /api/categories
+PATCH /api/products/{id}/category
+GET /api/analytics/categories?range=6m
+GET /api/analytics/basket
+GET /api/search?q=...
+GET /api/data-health
+PATCH /api/products/categories
+GET /api/export/{receipts|items|products}.csv
+GET /api/analytics/statistics?range=6m
+GET /api/overview
+GET /api/import/status
 POST /api/import/run
 ```
+
+`/api/analytics/statistics` returns the period metrics, monthly series (including
+empty calendar months), weekday/hour distributions, and current month/year
+comparisons in one request. Monetary values remain decimal strings; metrics are
+derived from `Receipt` records and are never stored as aggregate tables.
+
+Product price analytics consolidate repeated observations on the same calendar
+day by price unit, retaining the maximum observed price. Spend and purchase
+frequency rankings use full history; price-change rankings compare the two most
+recent consolidated observations for each unit.
+
+Categories belong to canonical products, so assigning one reclassifies all
+historical receipt items without rewriting the receipt evidence. Category spend
+uses observed `ReceiptItem.total_price`, including a virtual “Sin categoría”
+bucket; it is intentionally not forced to equal receipt totals.
+
+Basket insights are derived only from receipt history. A regular product has at
+least three distinct purchase dates and relative interval variability of 50% or
+less. Due-state labels are cautious inferences based on days since last purchase
+relative to the product's median interval; they are not shopping instructions.
+
+Search, exports and data-health checks are local read tools. Manual item edits
+change only normalized fields; the original PDF, extracted text and raw line
+evidence remain intact. Reprocessing intentionally rebuilds normalized values
+from the preserved source and therefore replaces any such corrections.
 
 Do not create endpoints merely for symmetry. Add them as screens/use cases require them.
 
@@ -226,6 +261,7 @@ Inicio
 Compras
 Productos
 Estadísticas
+Hábitos
 Configuración
 ```
 

@@ -20,6 +20,18 @@ class Store(Base):
     aliases: Mapped[list[ProductAlias]] = relationship(back_populates="store")
 
 
+class Category(Base):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    products: Mapped[list[Product]] = relationship(back_populates="category")
+
+
 class Receipt(Base):
     __tablename__ = "receipts"
     __table_args__ = (
@@ -53,9 +65,11 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     aliases: Mapped[list[ProductAlias]] = relationship(back_populates="product")
     receipt_items: Mapped[list[ReceiptItem]] = relationship(back_populates="product")
+    category: Mapped[Optional[Category]] = relationship(back_populates="products")
 
 
 class ProductAlias(Base):
