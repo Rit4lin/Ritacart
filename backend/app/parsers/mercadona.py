@@ -54,9 +54,9 @@ class MercadonaParser:
         purchased_at = self._parse_date_time(lines)
         total = self._parse_total(lines)
         items, warnings = self._parse_items(lines)
-        vat_breakdown = self._parse_vat_breakdown(lines)
         if not items:
-            warnings.append("No se ha podido interpretar ninguna línea de producto")
+            raise ReceiptParseError("No se ha podido interpretar ninguna línea de producto")
+        vat_breakdown = self._parse_vat_breakdown(lines)
         return ParsedReceipt(
             purchased_at=purchased_at,
             total=total,
@@ -152,7 +152,11 @@ class MercadonaParser:
     @staticmethod
     def _item_section(lines: list[str]) -> list[str] | None:
         start = next(
-            (index for index, line in enumerate(lines) if line.casefold().startswith("descripci")),
+            (
+                index
+                for index, line in enumerate(lines)
+                if "descripci" in line.casefold()
+            ),
             None,
         )
         if start is None:
