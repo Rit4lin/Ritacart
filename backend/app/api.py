@@ -6,6 +6,7 @@ from typing import Literal
 from decimal import Decimal
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -17,6 +18,7 @@ from .analytics.statistics import global_statistics
 from .analytics.statistics import _local_now
 from .analytics.categories import category_analytics
 from .analytics.basket import basket_insights
+from .services.data_tools import csv_export, data_health, decimal_or_none, search
 from .services.importer import ReceiptImportError, ReceiptImportService
 
 router = APIRouter(prefix="/api")
@@ -32,6 +34,19 @@ class ProductRenameRequest(BaseModel):
 
 class ProductCategoryRequest(BaseModel):
     category_id: int | None
+
+
+class BulkCategoryRequest(BaseModel):
+    product_ids: list[int]
+    category_id: int | None
+
+
+class ReceiptItemEditRequest(BaseModel):
+    product_id: int | None = None
+    quantity: str | None = None
+    unit_price: str | None = None
+    price_per_kg: str | None = None
+    total_price: str | None = None
 
 
 def _money(value: Decimal | None) -> str | None:
@@ -69,6 +84,7 @@ def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object
         "source_filename": receipt.source_filename,
         "imported_at": receipt.imported_at.isoformat(),
         "item_count": len(receipt.items),
+        "needs_review": not receipt.items or bool(json.loads(receipt.parser_warnings or "[]")),
     }
     if detail:
         payload["items"] = [_item_payload(item) for item in receipt.items]
@@ -160,6 +176,39 @@ def reprocess_receipt(receipt_id: int, request: Request) -> dict[str, object]:
     return {"receipt_id": result.receipt_id, "warnings": result.warnings}
 
 
+@router.patch("/receipts/{receipt_id}/items/{item_id}", tags=["receipts"])
+def edit_receipt_item(receipt_id: int, item_id: int, payload: ReceiptItemEditRequest, request: Request) -> dict[str, object]:
+    try:
+        values = {field: decimal_or_none(getattr(payload, field), field) for field in ("quantity", "unit_price", "price_per_kg", "total_price")}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    with request.app.state.session_factory() as session:
+        item = session.scalar(select(ReceiptItem).where(ReceiptItem.id == item_id, ReceiptItem.receipt_id == receipt_id))
+        if item is None:
+            raise HTTPException(status_code=404, detail="Línea no encontrada")
+        if payload.product_id is not None and session.get(Product, payload.product_id) is None:
+            raise HTTPException(status_code=422, detail="Producto no encontrado")
+        if payload.product_id is not None:
+            item.product_id = payload.product_id
+        for field, value in values.items():
+            if getattr(payload, field) is not None:
+                setattr(item, field, value)
+        session.commit()
+        return _item_payload(item)
+
+
+@router.get("/receipts/{receipt_id}/pdf", tags=["receipts"])
+def get_receipt_pdf(receipt_id: int, request: Request) -> FileResponse:
+    with request.app.state.session_factory() as session:
+        receipt = session.get(Receipt, receipt_id)
+        if receipt is None:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        path = request.app.state.settings.app_data_dir / "receipts" / f"{receipt.source_file_hash}.pdf"
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="PDF original no encontrado")
+        return FileResponse(path, media_type="application/pdf", filename=receipt.source_filename)
+
+
 @router.get("/products", tags=["products"])
 def list_products(request: Request) -> list[dict[str, object]]:
     with request.app.state.session_factory() as session:
@@ -192,6 +241,23 @@ def set_product_category(
         product.category_id = category.id if category else None
         session.commit()
         return {"product_id": product.id, "category": {"id": category.id, "name": category.name, "slug": category.slug} if category else None}
+
+
+@router.patch("/products/categories", tags=["products"])
+def set_products_category(payload: BulkCategoryRequest, request: Request) -> dict[str, object]:
+    ids = set(payload.product_ids)
+    if not ids:
+        raise HTTPException(status_code=422, detail="Selecciona al menos un producto")
+    with request.app.state.session_factory() as session:
+        products = session.scalars(select(Product).where(Product.id.in_(ids))).all()
+        if len(products) != len(ids):
+            raise HTTPException(status_code=422, detail="Uno o más productos no existen")
+        if payload.category_id is not None and session.get(Category, payload.category_id) is None:
+            raise HTTPException(status_code=422, detail="Categoría no encontrada")
+        for product in products:
+            product.category_id = payload.category_id
+        session.commit()
+        return {"updated_products": len(products)}
 
 
 @router.get("/products/{product_id}/analytics", tags=["products"])
@@ -259,6 +325,28 @@ def get_category_analytics(
 def get_basket_insights(request: Request) -> dict[str, object]:
     with request.app.state.session_factory() as session:
         return basket_insights(session, _local_now(request.app.state.settings.timezone))
+
+
+@router.get("/search", tags=["search"])
+def global_search(request: Request, q: str = "") -> dict[str, list[dict[str, object]]]:
+    with request.app.state.session_factory() as session:
+        return search(session, q)
+
+
+@router.get("/data-health", tags=["system"])
+def get_data_health(request: Request) -> dict[str, int]:
+    with request.app.state.session_factory() as session:
+        return data_health(session)
+
+
+@router.get("/export/{kind}.csv", tags=["export"])
+def export_csv(kind: str, request: Request) -> Response:
+    try:
+        with request.app.state.session_factory() as session:
+            content = csv_export(session, kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(content, media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="ritacart-{kind}.csv"'})
 
 
 @router.get("/analytics/statistics", tags=["analytics"])

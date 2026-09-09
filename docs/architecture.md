@@ -214,6 +214,12 @@ GET /api/categories
 PATCH /api/products/{id}/category
 GET /api/analytics/categories?range=6m
 GET /api/analytics/basket
+GET /api/search?q=...
+GET /api/data-health
+GET /api/receipts/{id}/pdf
+PATCH /api/receipts/{id}/items/{item_id}
+PATCH /api/products/categories
+GET /api/export/{receipts|items|products}.csv
 GET /api/analytics/statistics?range=6m
 GET /api/analytics/overview
 GET /api/analytics/spend
@@ -240,6 +246,11 @@ Basket insights are derived only from receipt history. A regular product has at
 least three distinct purchase dates and relative interval variability of 50% or
 less. Due-state labels are cautious inferences based on days since last purchase
 relative to the product's median interval; they are not shopping instructions.
+
+Search, exports and data-health checks are local read tools. Manual item edits
+change only normalized fields; the original PDF, extracted text and raw line
+evidence remain intact. Reprocessing intentionally rebuilds normalized values
+from the preserved source and therefore replaces any such corrections.
 
 Do not create endpoints merely for symmetry. Add them as screens/use cases require them.
 

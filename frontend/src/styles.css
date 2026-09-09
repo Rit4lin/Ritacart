@@ -13,6 +13,7 @@ nav { display: grid; gap: .3rem; }
 .nav-item:hover, .nav-item.active { background: #385646; color: white; }
 .sidebar-note { color: #a8b9ac; font-size: .8rem; line-height: 1.5; margin: auto .65rem .3rem; }
 .content { margin: 0 auto; max-width: 76rem; padding: 3rem clamp(1.4rem, 5vw, 5rem); width: 100%; }
+.global-search { margin-bottom: 1.5rem; position: relative; }.global-search label { display: block; font-size: .78rem; font-weight: 700; margin-bottom: .3rem; }.global-search input { border: 1px solid #cfd8cb; border-radius: .55rem; padding: .65rem .75rem; width: min(30rem, 100%); }.search-results { background: white; border: 1px solid #dfe5db; border-radius: .6rem; box-shadow: 0 .5rem 1.5rem #21382c1a; display: grid; gap: .7rem; margin-top: .35rem; max-width: 34rem; padding: .75rem; position: absolute; width: 100%; z-index: 2; }.search-results section { display: grid; gap: .2rem; }.search-results button { background: transparent; color: #28352c; padding: .45rem; text-align: left; }.search-results button:hover { background: #eef3e7; }
 header { margin-bottom: 2.5rem; }
 .page-heading { align-items: end; display: flex; justify-content: space-between; gap: 1rem; }
 .eyebrow { color: #6a835d; font-size: .74rem; font-weight: 800; letter-spacing: .1em; margin: 0 0 .55rem; text-transform: uppercase; }
