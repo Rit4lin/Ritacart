@@ -59,6 +59,14 @@ p { line-height: 1.5; }
 .item-row div { display: grid; }
 .empty { align-items: center; color: #667169; display: flex; justify-content: center; min-height: 5rem; text-align: center; }
 .product-detail { display: grid; gap: 1.2rem; }
+.product-metrics { display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 1.2rem 0; }
+.product-metrics .metric { padding: .85rem; }
+.product-metrics .metric strong { font-size: 1rem; overflow-wrap: anywhere; }
+.price-summaries { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); margin: 1rem 0; }
+.price-summary { background: #f5f8f1; border: 1px solid #e1e8d9; border-radius: .7rem; padding: .9rem; }
+.price-summary h3 { margin: 0 0 .6rem; }
+.price-summary dl { display: grid; font-size: .84rem; grid-template-columns: 1fr auto; margin: 0; row-gap: .4rem; }
+.price-summary dt { color: #667169; }.price-summary dd { font-weight: 700; margin: 0; text-align: right; }
 .alias-list { color: #65726a; font-size: .88rem; }
 .rename-control { border-bottom: 1px solid #e4e8e0; display: grid; gap: .45rem; margin-top: 1rem; padding-bottom: 1rem; }
 .rename-control label { font-size: .86rem; font-weight: 700; }
@@ -90,6 +98,11 @@ p { line-height: 1.5; }
 .top-products button > span { align-items: center; display: flex; gap: .7rem; }
 .top-products b { align-items: center; background: #e9efe4; border-radius: 999px; color: #365a42; display: inline-flex; height: 1.7rem; justify-content: center; width: 1.7rem; }
 .top-products small { color: #65726a; }
+.insights-section { margin-top: 2.4rem; }.insights-section > h2 { margin-bottom: 1rem; }
+.insight-grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.insight-ranking h3 { font-size: 1.08rem; margin: 0; }.insight-ranking ol { display: grid; gap: .3rem; list-style: none; margin: .9rem 0 0; padding: 0; }
+.insight-ranking button { align-items: start; background: transparent; color: #28352c; display: flex; flex-direction: column; gap: .3rem; padding: .65rem .45rem; text-align: left; width: 100%; }.insight-ranking button:hover { background: #eef3e7; }
+.insight-ranking button > span { align-items: center; display: flex; gap: .55rem; max-width: 100%; }.insight-ranking strong { overflow-wrap: anywhere; }.insight-ranking b { align-items: center; background: #e9efe4; border-radius: 999px; color: #365a42; display: inline-flex; flex: 0 0 auto; height: 1.5rem; justify-content: center; width: 1.5rem; }.insight-ranking small { color: #65726a; line-height: 1.4; }
 .configuration { max-width: 44rem; }
 .configuration > div p { color: #65726a; }
 .status { background: #f3ddd6; border-radius: 3rem; color: #913e30; display: inline-block; font-size: .8rem; font-weight: 700; margin: .5rem 0 1.2rem; padding: .35rem .6rem; }
@@ -97,4 +110,4 @@ p { line-height: 1.5; }
 .configuration dl { display: grid; grid-template-columns: minmax(10rem, 1fr) 2fr; margin: 1.2rem 0 1.5rem; row-gap: .8rem; }
 .configuration dt { color: #667169; }
 .configuration dd { margin: 0; }
-@media (max-width: 720px) { .app-shell { grid-template-columns: 1fr; }.sidebar { padding: 1rem; }.brand { padding: 0 .3rem 1rem; }.sidebar nav { display: flex; overflow-x: auto; }.nav-item { text-align: center; white-space: nowrap; }.sidebar-note { display: none; }.content { padding: 2rem 1.2rem; }.metrics, .statistics-metrics, .comparison-grid, .purchase-layout, .product-layout, .chart-grid { grid-template-columns: 1fr; }.chart-grid .line-chart, .statistics-charts .line-chart { grid-column: auto; }.latest { align-items: start; flex-direction: column; gap: 1rem; }.page-heading, .statistics-heading { align-items: start; flex-direction: column; }.top-products button { align-items: start; flex-direction: column; gap: .25rem; }.bar-row { grid-template-columns: 3.5rem 1fr; }.rename-control > div { align-items: stretch; flex-direction: column; } }
+@media (max-width: 720px) { .app-shell { grid-template-columns: 1fr; }.sidebar { padding: 1rem; }.brand { padding: 0 .3rem 1rem; }.sidebar nav { display: flex; overflow-x: auto; }.nav-item { text-align: center; white-space: nowrap; }.sidebar-note { display: none; }.content { padding: 2rem 1.2rem; }.metrics, .statistics-metrics, .comparison-grid, .purchase-layout, .product-layout, .chart-grid, .product-metrics, .insight-grid { grid-template-columns: 1fr; }.chart-grid .line-chart, .statistics-charts .line-chart { grid-column: auto; }.latest { align-items: start; flex-direction: column; gap: 1rem; }.page-heading, .statistics-heading { align-items: start; flex-direction: column; }.top-products button { align-items: start; flex-direction: column; gap: .25rem; }.bar-row { grid-template-columns: 3.5rem 1fr; }.rename-control > div { align-items: stretch; flex-direction: column; } }

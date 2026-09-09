@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from .models import Receipt, ReceiptItem, ReceiptVat
 from .analytics.products import list_products as product_list
-from .analytics.products import merge_products, product_analytics, rename_product, top_products
+from .analytics.products import merge_products, product_analytics, product_insights, rename_product, top_products
 from .analytics.statistics import global_statistics
 from .services.importer import ReceiptImportError, ReceiptImportService
 
@@ -204,6 +204,12 @@ def rename_product_endpoint(
 def get_top_products(request: Request) -> list[dict[str, object]]:
     with request.app.state.session_factory() as session:
         return top_products(session)
+
+
+@router.get("/analytics/products/insights", tags=["analytics"])
+def get_product_insights(request: Request) -> dict[str, list[dict[str, object]]]:
+    with request.app.state.session_factory() as session:
+        return product_insights(session)
 
 
 @router.get("/analytics/statistics", tags=["analytics"])

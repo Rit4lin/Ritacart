@@ -209,6 +209,7 @@ GET /api/products/{id}/analytics
 POST /api/products/{id}/merge
 POST /api/products/{id}/rename
 GET /api/analytics/products/top
+GET /api/analytics/products/insights
 GET /api/analytics/statistics?range=6m
 GET /api/analytics/overview
 GET /api/analytics/spend
@@ -220,6 +221,11 @@ POST /api/import/run
 empty calendar months), weekday/hour distributions, and current month/year
 comparisons in one request. Monetary values remain decimal strings; metrics are
 derived from `Receipt` records and are never stored as aggregate tables.
+
+Product price analytics consolidate repeated observations on the same calendar
+day by price unit, retaining the maximum observed price. Spend and purchase
+frequency rankings use full history; price-change rankings compare the two most
+recent consolidated observations for each unit.
 
 Do not create endpoints merely for symmetry. Add them as screens/use cases require them.
 
