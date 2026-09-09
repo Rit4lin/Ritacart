@@ -209,11 +209,17 @@ GET /api/products/{id}/analytics
 POST /api/products/{id}/merge
 POST /api/products/{id}/rename
 GET /api/analytics/products/top
+GET /api/analytics/statistics?range=6m
 GET /api/analytics/overview
 GET /api/analytics/spend
 GET /api/analytics/shopping-times
 POST /api/import/run
 ```
+
+`/api/analytics/statistics` returns the period metrics, monthly series (including
+empty calendar months), weekday/hour distributions, and current month/year
+comparisons in one request. Monetary values remain decimal strings; metrics are
+derived from `Receipt` records and are never stored as aggregate tables.
 
 Do not create endpoints merely for symmetry. Add them as screens/use cases require them.
 
