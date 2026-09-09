@@ -18,7 +18,7 @@ TOTAL 3,25
 
 COLUMN_LAYOUT_RECEIPT_TEXT = """MERCADONA
 01/08/2026 14:30
-Descripción
+Cnt. Descripción
 P. Unit
 Importe
 1 BEBIDA VEGETAL

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from ..config import Settings
 from ..models import Product, ProductAlias, Receipt, ReceiptItem, ReceiptVat, Store
-from ..parsers.base import ParsedReceiptItem, ParsedReceiptVat
+from ..parsers.base import ParsedReceipt, ParsedReceiptItem, ParsedReceiptVat
 from ..parsers.mercadona import MercadonaParser
 from .pdf import PdfExtractionError, extract_text
 
@@ -79,7 +79,7 @@ class ReceiptImportService:
                 select(Receipt).where(Receipt.source_file_hash == file_hash)
             )
             if existing:
-                return ImportResult(existing.id, imported=False, duplicate=True, warnings=[])
+                return self._duplicate_result(session, existing)
             if source_message_id is not None and source_attachment_index is not None:
                 existing = session.scalar(
                     select(Receipt).where(
@@ -88,7 +88,7 @@ class ReceiptImportService:
                     )
                 )
                 if existing:
-                    return ImportResult(existing.id, imported=False, duplicate=True, warnings=[])
+                    return self._duplicate_result(session, existing)
 
             try:
                 extracted_text = extract_text(pdf_bytes)
@@ -120,7 +120,7 @@ class ReceiptImportService:
                 session.rollback()
                 existing = session.scalar(select(Receipt).where(Receipt.source_file_hash == file_hash))
                 if existing:
-                    return ImportResult(existing.id, imported=False, duplicate=True, warnings=[])
+                    return self._duplicate_result(session, existing)
                 raise
             session.refresh(receipt)
             return ImportResult(
@@ -140,18 +140,14 @@ class ReceiptImportService:
             except ValueError as exc:
                 raise ReceiptImportError(str(exc)) from exc
 
-            receipt.purchased_at = parsed.purchased_at
-            receipt.total = parsed.total
-            receipt.parser_warnings = json.dumps(parsed.warnings, ensure_ascii=False)
-            receipt.items.clear()
-            receipt.vat_breakdown.clear()
-            session.flush()
-            store = receipt.store
-            for item in parsed.items:
-                self._append_item(session, receipt, store, item)
-            self._append_vat_breakdown(receipt, parsed.vat_breakdown)
+            self._replace_normalized_data(session, receipt, parsed)
             session.commit()
-            return ImportResult(receipt.id, imported=True, duplicate=False, warnings=parsed.warnings)
+            return ImportResult(
+                receipt.id,
+                imported=True,
+                duplicate=False,
+                warnings=parsed.warnings
+            )
 
     def run_imap_import(self) -> int:
         """Fetch configured Mercadona PDF attachments once, without marking mail read."""
@@ -301,6 +297,47 @@ class ReceiptImportService:
                     raw_text=vat.raw_text,
                 )
             )
+
+    def _duplicate_result(self, session: Session, receipt: Receipt) -> ImportResult:
+        if receipt.items or not receipt.source_extracted_text:
+            return ImportResult(receipt.id, imported=False, duplicate=True, warnings=[])
+
+        try:
+            parsed = self.parser.parse(receipt.source_extracted_text)
+        except ValueError as exc:
+            logger.warning("Could not repair incomplete duplicate receipt %s: %s", receipt.id, exc)
+            return ImportResult(
+                receipt.id,
+                imported=False,
+                duplicate=True,
+                warnings=[str(exc)],
+            )
+
+        self._replace_normalized_data(session, receipt, parsed)
+        session.commit()
+        return ImportResult(
+            receipt.id,
+            imported=False,
+            duplicate=True,
+            warnings=parsed.warnings
+        )
+
+    def _replace_normalized_data(
+        self,
+        session: Session,
+        receipt: Receipt,
+        parsed: ParsedReceipt,
+    ) -> None:
+        receipt.purchased_at = parsed.purchased_at
+        receipt.total = parsed.total
+        receipt.parser_warnings = json.dumps(parsed.warnings, ensure_ascii=False)
+        receipt.items.clear()
+        receipt.vat_breakdown.clear()
+        session.flush()
+        store = receipt.store
+        for item in parsed.items:
+            self._append_item(session, receipt, store, item)
+        self._append_vat_breakdown(receipt, parsed.vat_breakdown)
 
     def _set_status(self, **values: object) -> None:
         with self._status_lock:
