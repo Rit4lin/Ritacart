@@ -10,10 +10,12 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from .models import Receipt, ReceiptItem, ReceiptVat
+from .models import Category, Product, Receipt, ReceiptItem, ReceiptVat
 from .analytics.products import list_products as product_list
 from .analytics.products import merge_products, product_analytics, product_insights, rename_product, top_products
 from .analytics.statistics import global_statistics
+from .analytics.statistics import _local_now
+from .analytics.categories import category_analytics
 from .services.importer import ReceiptImportError, ReceiptImportService
 
 router = APIRouter(prefix="/api")
@@ -25,6 +27,10 @@ class ProductMergeRequest(BaseModel):
 
 class ProductRenameRequest(BaseModel):
     name: str
+
+
+class ProductCategoryRequest(BaseModel):
+    category_id: int | None
 
 
 def _money(value: Decimal | None) -> str | None:
@@ -159,6 +165,34 @@ def list_products(request: Request) -> list[dict[str, object]]:
         return product_list(session)
 
 
+@router.get("/categories", tags=["categories"])
+def list_categories(request: Request) -> list[dict[str, object]]:
+    with request.app.state.session_factory() as session:
+        categories = session.scalars(
+            select(Category).options(selectinload(Category.products)).order_by(Category.sort_order)
+        ).all()
+        return [
+            {"id": category.id, "name": category.name, "slug": category.slug, "product_count": len(category.products)}
+            for category in categories
+        ]
+
+
+@router.patch("/products/{product_id}/category", tags=["products"])
+def set_product_category(
+    product_id: int, payload: ProductCategoryRequest, request: Request
+) -> dict[str, object]:
+    with request.app.state.session_factory() as session:
+        product = session.get(Product, product_id)
+        if product is None:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        category = session.get(Category, payload.category_id) if payload.category_id is not None else None
+        if payload.category_id is not None and category is None:
+            raise HTTPException(status_code=422, detail="Categoría no encontrada")
+        product.category_id = category.id if category else None
+        session.commit()
+        return {"product_id": product.id, "category": {"id": category.id, "name": category.name, "slug": category.slug} if category else None}
+
+
 @router.get("/products/{product_id}/analytics", tags=["products"])
 def get_product_analytics(product_id: int, request: Request) -> dict[str, object]:
     with request.app.state.session_factory() as session:
@@ -210,6 +244,14 @@ def get_top_products(request: Request) -> list[dict[str, object]]:
 def get_product_insights(request: Request) -> dict[str, list[dict[str, object]]]:
     with request.app.state.session_factory() as session:
         return product_insights(session)
+
+
+@router.get("/analytics/categories", tags=["analytics"])
+def get_category_analytics(
+    request: Request, range: Literal["3m", "6m", "1y", "all"] = "6m"
+) -> dict[str, object]:
+    with request.app.state.session_factory() as session:
+        return category_analytics(session, range, _local_now(request.app.state.settings.timezone))
 
 
 @router.get("/analytics/statistics", tags=["analytics"])

@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session, selectinload
 
-from ..models import Product, ProductAlias, Receipt, ReceiptItem
+from ..models import Category, Product, ProductAlias, Receipt, ReceiptItem
 
 
 def _decimal(value: Decimal | None) -> str:
@@ -20,6 +20,7 @@ def _money(value: Decimal | None) -> str | None:
 def _product_query():
     return select(Product).options(
         selectinload(Product.aliases),
+        selectinload(Product.category),
         selectinload(Product.receipt_items).selectinload(ReceiptItem.receipt),
     )
 
@@ -35,7 +36,14 @@ def _summary(product: Product) -> dict[str, object]:
         "purchase_count": len(receipt_ids),
         "total_quantity": _decimal(quantities),
         "last_purchased_at": latest.isoformat() if latest else None,
+        "category": _category_payload(product.category),
     }
+
+
+def _category_payload(category: Category | None) -> dict[str, object] | None:
+    if category is None:
+        return None
+    return {"id": category.id, "name": category.name, "slug": category.slug}
 
 
 def _daily_prices(product: Product) -> dict[tuple[str, str], Decimal]:
@@ -82,7 +90,11 @@ def list_products(session: Session) -> list[dict[str, object]]:
 
 
 def top_products(session: Session, limit: int = 5) -> list[dict[str, object]]:
-    return list_products(session)[:limit]
+    # Keep the compact historical ranking payload stable; category is exposed by /products.
+    return [
+        {key: value for key, value in product.items() if key != "category"}
+        for product in list_products(session)[:limit]
+    ]
 
 
 def product_analytics(session: Session, product_id: int) -> dict[str, object] | None:
@@ -195,6 +207,8 @@ def merge_products(session: Session, source_product_id: int, target_product_id: 
         return None
     source_name = source.name
     target_name = target.name
+    if target.category_id is None and source.category_id is not None:
+        target.category_id = source.category_id
 
     session.execute(
         update(ProductAlias)

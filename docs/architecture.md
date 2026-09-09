@@ -210,6 +210,9 @@ POST /api/products/{id}/merge
 POST /api/products/{id}/rename
 GET /api/analytics/products/top
 GET /api/analytics/products/insights
+GET /api/categories
+PATCH /api/products/{id}/category
+GET /api/analytics/categories?range=6m
 GET /api/analytics/statistics?range=6m
 GET /api/analytics/overview
 GET /api/analytics/spend
@@ -226,6 +229,11 @@ Product price analytics consolidate repeated observations on the same calendar
 day by price unit, retaining the maximum observed price. Spend and purchase
 frequency rankings use full history; price-change rankings compare the two most
 recent consolidated observations for each unit.
+
+Categories belong to canonical products, so assigning one reclassifies all
+historical receipt items without rewriting the receipt evidence. Category spend
+uses observed `ReceiptItem.total_price`, including a virtual “Sin categoría”
+bucket; it is intentionally not forced to equal receipt totals.
 
 Do not create endpoints merely for symmetry. Add them as screens/use cases require them.
 
