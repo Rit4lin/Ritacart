@@ -49,6 +49,38 @@ def test_message_id_duplicate_is_idempotent(client, receipt_pdf) -> None:
     assert len(client.get("/api/receipts").json()) == 1
 
 
+def test_duplicate_incomplete_receipt_is_automatically_reprocessed(client) -> None:
+    pdf = make_pdf(COLUMN_LAYOUT_RECEIPT_TEXT)
+    first = client.post(
+        "/api/receipts/import",
+        files={"file": ("mercadona.pdf", pdf, "application/pdf")},
+    )
+    receipt_id = first.json()["receipt_id"]
+
+    with client.app.state.session_factory() as session:
+        receipt = session.get(Receipt, receipt_id)
+        assert receipt is not None
+        receipt.items.clear()
+        receipt.parser_warnings = '["No se ha podido interpretar ninguna línea de producto"]'
+        session.commit()
+
+    second = client.post(
+        "/api/receipts/import",
+        files={"file": ("mercadona.pdf", pdf, "application/pdf")},
+    )
+
+    assert second.status_code == 201
+    assert second.json()["duplicate"] is True
+    detail = client.get(f"/api/receipts/{receipt_id}").json()
+    assert detail["item_count"] == 4
+    assert [item["raw_name"] for item in detail["items"]] == [
+        "BEBIDA VEGETAL",
+        "REFRESCO SIN AZÚCAR",
+        "QUESO FRESCO",
+        "PERA DE TEMPORADA",
+    ]
+
+
 def test_reprocess_receipt_replaces_bad_normalized_data(client) -> None:
     pdf = make_pdf(COLUMN_LAYOUT_RECEIPT_TEXT)
     imported = client.post(
