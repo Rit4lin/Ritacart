@@ -202,9 +202,10 @@ GET /api/health
 GET /api/receipts
 GET /api/receipts/{id}
 POST /api/receipts/{id}/reprocess
+GET /api/receipts/{id}/pdf
+PATCH /api/receipts/{id}/items/{item_id}
+POST /api/receipts/import
 GET /api/products
-GET /api/products/{id}
-GET /api/products/{id}/history
 GET /api/products/{id}/analytics
 POST /api/products/{id}/merge
 POST /api/products/{id}/rename
@@ -216,14 +217,11 @@ GET /api/analytics/categories?range=6m
 GET /api/analytics/basket
 GET /api/search?q=...
 GET /api/data-health
-GET /api/receipts/{id}/pdf
-PATCH /api/receipts/{id}/items/{item_id}
 PATCH /api/products/categories
 GET /api/export/{receipts|items|products}.csv
 GET /api/analytics/statistics?range=6m
-GET /api/analytics/overview
-GET /api/analytics/spend
-GET /api/analytics/shopping-times
+GET /api/overview
+GET /api/import/status
 POST /api/import/run
 ```
 
@@ -263,6 +261,7 @@ Inicio
 Compras
 Productos
 Estadísticas
+Hábitos
 Configuración
 ```
 

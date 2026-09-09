@@ -18,6 +18,9 @@ def test_manual_pdf_import_and_receipt_detail(client, receipt_pdf) -> None:
     assert receipts[0]["total"] == "3.25"
     detail = client.get(f"/api/receipts/{receipt_id}")
     assert detail.status_code == 200
+    assert detail.json()["needs_review"] is False
+    assert detail.json()["parser_warnings"] == []
+    assert "MERCADONA" in detail.json()["source_extracted_text"]
     assert [item["raw_name"] for item in detail.json()["items"]] == [
         "LIMÓN ZERO 2L",
         "PERA CONFERENCIA",
@@ -63,6 +66,10 @@ def test_duplicate_incomplete_receipt_is_automatically_reprocessed(client) -> No
         receipt.items.clear()
         receipt.parser_warnings = '["No se ha podido interpretar ninguna línea de producto"]'
         session.commit()
+
+    incomplete = client.get(f"/api/receipts/{receipt_id}").json()
+    assert incomplete["needs_review"] is True
+    assert incomplete["parser_warnings"] == ["No se ha podido interpretar ninguna línea de producto"]
 
     second = client.post(
         "/api/receipts/import",

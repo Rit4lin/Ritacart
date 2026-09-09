@@ -90,6 +90,7 @@ def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object
         payload["items"] = [_item_payload(item) for item in receipt.items]
         payload["vat_breakdown"] = [_vat_payload(vat) for vat in receipt.vat_breakdown]
         payload["parser_warnings"] = json.loads(receipt.parser_warnings or "[]")
+        payload["source_extracted_text"] = receipt.source_extracted_text
     return payload
 
 
