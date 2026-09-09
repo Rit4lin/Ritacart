@@ -1,5 +1,8 @@
 from decimal import Decimal
 
+import pytest
+
+from app.parsers.base import ReceiptParseError
 from app.parsers.mercadona import MercadonaParser
 
 from conftest import COLUMN_LAYOUT_RECEIPT_TEXT, RECEIPT_TEXT
@@ -51,3 +54,18 @@ def test_mercadona_parser_handles_column_layout_and_vat_breakdown() -> None:
         (Decimal("10"), Decimal("5.00"), Decimal("0.50")),
         (Decimal("21"), Decimal("3.60"), Decimal("0.76")),
     ]
+
+
+def test_mercadona_parser_keeps_plain_description_header_compatible() -> None:
+    parsed = MercadonaParser().parse(
+        COLUMN_LAYOUT_RECEIPT_TEXT.replace("Cnt. Descripción", "Descripción")
+    )
+
+    assert len(parsed.items) == 4
+
+
+def test_mercadona_parser_rejects_receipt_without_products() -> None:
+    with pytest.raises(ReceiptParseError, match="línea de producto"):
+        MercadonaParser().parse(
+            "MERCADONA\n01/08/2026 14:30\nTOTAL (€)\n1,00\n"
+        )
