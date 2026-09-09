@@ -213,6 +213,7 @@ GET /api/analytics/products/insights
 GET /api/categories
 PATCH /api/products/{id}/category
 GET /api/analytics/categories?range=6m
+GET /api/analytics/basket
 GET /api/analytics/statistics?range=6m
 GET /api/analytics/overview
 GET /api/analytics/spend
@@ -234,6 +235,11 @@ Categories belong to canonical products, so assigning one reclassifies all
 historical receipt items without rewriting the receipt evidence. Category spend
 uses observed `ReceiptItem.total_price`, including a virtual “Sin categoría”
 bucket; it is intentionally not forced to equal receipt totals.
+
+Basket insights are derived only from receipt history. A regular product has at
+least three distinct purchase dates and relative interval variability of 50% or
+less. Due-state labels are cautious inferences based on days since last purchase
+relative to the product's median interval; they are not shopping instructions.
 
 Do not create endpoints merely for symmetry. Add them as screens/use cases require them.
 

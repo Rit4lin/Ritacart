@@ -16,6 +16,7 @@ from .analytics.products import merge_products, product_analytics, product_insig
 from .analytics.statistics import global_statistics
 from .analytics.statistics import _local_now
 from .analytics.categories import category_analytics
+from .analytics.basket import basket_insights
 from .services.importer import ReceiptImportError, ReceiptImportService
 
 router = APIRouter(prefix="/api")
@@ -252,6 +253,12 @@ def get_category_analytics(
 ) -> dict[str, object]:
     with request.app.state.session_factory() as session:
         return category_analytics(session, range, _local_now(request.app.state.settings.timezone))
+
+
+@router.get("/analytics/basket", tags=["analytics"])
+def get_basket_insights(request: Request) -> dict[str, object]:
+    with request.app.state.session_factory() as session:
+        return basket_insights(session, _local_now(request.app.state.settings.timezone))
 
 
 @router.get("/analytics/statistics", tags=["analytics"])
