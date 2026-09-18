@@ -7,6 +7,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from email import message_from_bytes
 from email.message import Message
 from pathlib import Path
@@ -280,26 +281,35 @@ class ReceiptImportService:
         )
 
     @staticmethod
-    def _parsed_item_signature(items: list[ParsedReceiptItem]) -> tuple[tuple[str, str, str], ...]:
+    def _signature_decimal(value: object | None) -> str:
+        if value is None:
+            return ""
+        decimal_value = Decimal(str(value))
+        if decimal_value == 0:
+            return "0"
+        return format(decimal_value.normalize(), "f")
+
+    @classmethod
+    def _parsed_item_signature(cls, items: list[ParsedReceiptItem]) -> tuple[tuple[str, str, str], ...]:
         return tuple(
             sorted(
                 (
                     item.raw_name.casefold().strip(),
-                    str(item.quantity) if item.quantity is not None else "",
-                    str(item.total_price) if item.total_price is not None else "",
+                    cls._signature_decimal(item.quantity),
+                    cls._signature_decimal(item.total_price),
                 )
                 for item in items
             )
         )
 
-    @staticmethod
-    def _stored_item_signature(items: list[ReceiptItem]) -> tuple[tuple[str, str, str], ...]:
+    @classmethod
+    def _stored_item_signature(cls, items: list[ReceiptItem]) -> tuple[tuple[str, str, str], ...]:
         return tuple(
             sorted(
                 (
                     item.raw_name.casefold().strip(),
-                    str(item.quantity) if item.quantity is not None else "",
-                    str(item.total_price) if item.total_price is not None else "",
+                    cls._signature_decimal(item.quantity),
+                    cls._signature_decimal(item.total_price),
                 )
                 for item in items
             )
