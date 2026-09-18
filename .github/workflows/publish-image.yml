@@ -38,7 +38,7 @@ jobs:
 
       - name: Run backend tests
         working-directory: backend
-        run: pytest -q
+        run: PYTHONPATH=. pytest -q
 
   build:
     needs: test
