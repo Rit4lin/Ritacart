@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 from .base import ParsedReceipt, ParsedReceiptItem, ParsedReceiptVat, ReceiptParseError
 
 
-_DATE_RE = re.compile(r"(?<!\d)(\d{2}[/-]\d{2}[/-]\d{4})(?:\s+(\d{2}:\d{2}))?")
+_DATE_RE = re.compile(r"(?<!\d)(\d{2}[./-]\d{2}[/-]\d{4})(?:\s+(\d{2}:\d{2}))?")
 _TIME_RE = re.compile(r"(?<!\d)(\d{2}:\d{2})(?!\d)")
 _TOTAL_RE = re.compile(r"(?:TOTAL(?:\s+(?:A\s+PAGAR|COMPRA))?|IMPORTE\s+TOTAL)\D{0,20}(\d+[,.]\d{2})", re.I)
 _TOTAL_INLINE_RE = re.compile(
