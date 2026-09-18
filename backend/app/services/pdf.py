@@ -23,7 +23,7 @@ def _normalise_text(text: str) -> str:
         .replace("\r\n", "\n")
         .replace("\r", "\n")
     )
-    text = re.sub(r"(?<=\d)\s*([,.])\s*(?=\d)", r"\1", text)
+    text = re.sub(r"(?<=\d)\s*([,./-])\s*(?=\d)", r"\1", text)
     text = re.sub(r"[ \t]+\n", "\n", text)
     return text.strip()
 
