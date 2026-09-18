@@ -1,3 +1,5 @@
+import fitz
+
 from app.models import Receipt
 
 from conftest import COLUMN_LAYOUT_RECEIPT_TEXT, make_pdf
@@ -16,6 +18,8 @@ def test_manual_pdf_import_and_receipt_detail(client, receipt_pdf) -> None:
     receipts = client.get("/api/receipts").json()
     assert len(receipts) == 1
     assert receipts[0]["total"] == "3.25"
+    assert receipts[0]["source"] == "manual"
+    assert receipts[0]["needs_review"] is False
     detail = client.get(f"/api/receipts/{receipt_id}")
     assert detail.status_code == 200
     assert detail.json()["needs_review"] is False
@@ -100,6 +104,7 @@ def test_reprocess_receipt_replaces_bad_normalized_data(client) -> None:
         assert receipt is not None
         receipt.total = "11.10"
         receipt.items.clear()
+        receipt.source_extracted_text = "texto corrupto"
         session.commit()
 
     response = client.post(f"/api/receipts/{receipt_id}/reprocess")
@@ -113,3 +118,43 @@ def test_reprocess_receipt_replaces_bad_normalized_data(client) -> None:
         {"rate": "10.00", "taxable_base": "5.00", "tax_amount": "0.50"},
         {"rate": "21.00", "taxable_base": "3.60", "tax_amount": "0.76"},
     ]
+
+
+def test_manual_ocr_pdf_with_spaced_punctuation_is_imported(client) -> None:
+    pdf = make_pdf(
+        """MERCADONA
+01 . 08 . 2026 14:30
+Descripcion
+P. Unit.
+Importe
+1 PAN DE MOLDE 1 , 25
+2 AGUA MINERAL 0 , 55 1 , 10
+TOTAL 2 , 35
+"""
+    )
+
+    response = client.post(
+        "/api/receipts/import",
+        files={"file": ("ticket-escaneado-ocr.pdf", pdf, "application/pdf")},
+    )
+
+    assert response.status_code == 201
+    detail = client.get(f"/api/receipts/{response.json()['receipt_id']}").json()
+    assert detail["total"] == "2.35"
+    assert [item["raw_name"] for item in detail["items"]] == ["PAN DE MOLDE", "AGUA MINERAL"]
+    assert detail["needs_review"] is False
+
+
+def test_textless_scan_explains_that_ocr_is_required(client) -> None:
+    document = fitz.open()
+    document.new_page()
+    pdf = document.tobytes()
+    document.close()
+
+    response = client.post(
+        "/api/receipts/import",
+        files={"file": ("scan-sin-ocr.pdf", pdf, "application/pdf")},
+    )
+
+    assert response.status_code == 422
+    assert "OCR" in response.json()["detail"]

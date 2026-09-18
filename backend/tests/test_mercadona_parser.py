@@ -69,3 +69,35 @@ def test_mercadona_parser_rejects_receipt_without_products() -> None:
         MercadonaParser().parse(
             "MERCADONA\n01/08/2026 14:30\nTOTAL (€)\n1,00\n"
         )
+
+
+def test_mercadona_parser_handles_ocr_style_single_price_lines_and_dotted_date() -> None:
+    parsed = MercadonaParser().parse(
+        """MERCADONA
+01.08.2026 14:30
+Descripcion
+P. Unit.
+Importe
+1 PAN DE MOLDE 1,25
+2 AGUA MINERAL 0,55 1,10
+TOTAL 2,35
+"""
+    )
+
+    assert parsed.purchased_at.isoformat() == "2026-08-01T14:30:00"
+    assert [item.raw_name for item in parsed.items] == ["PAN DE MOLDE", "AGUA MINERAL"]
+    assert parsed.items[0].unit_price == Decimal("1.25")
+    assert parsed.items[1].unit_price == Decimal("0.55")
+    assert parsed.warnings == []
+
+
+def test_mercadona_parser_warns_when_line_totals_do_not_match_receipt_total() -> None:
+    parsed = MercadonaParser().parse(
+        """MERCADONA
+01/08/2026 14:30
+1 PAN 1,00 1,00
+TOTAL 2,00
+"""
+    )
+
+    assert any("no coincide con el total" in warning for warning in parsed.warnings)

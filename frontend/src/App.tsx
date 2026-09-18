@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useState } from 'react'
 
 type Page = 'inicio' | 'compras' | 'productos' | 'estadisticas' | 'habitos' | 'configuracion'
 type ImportStatus = { enabled: boolean; last_run: string | null; last_success: string | null; last_error: string | null; imported_receipts_last_run: number }
-type ReceiptSummary = { id: number; store: string; purchased_at: string; total: string; source_filename: string; imported_at: string; item_count: number }
+type ReceiptSummary = { id: number; store: string; purchased_at: string; total: string; source_filename: string; source: 'email' | 'manual'; imported_at: string; item_count: number; needs_review: boolean }
 type ReceiptDetail = ReceiptSummary & { needs_review: boolean; parser_warnings: string[]; source_extracted_text: string; items: Array<{ id: number; raw_name: string; quantity: string | null; unit: string | null; unit_price: string | null; price_per_kg: string | null; total_price: string | null }>; vat_breakdown: Array<{ rate: string; taxable_base: string; tax_amount: string }> }
 type ProductSummary = { id: number; name: string; purchase_count: number; total_quantity: string; last_purchased_at: string | null; category: { id: number; name: string; slug: string } | null }
 type Category = { id: number; name: string; slug: string; product_count: number }
@@ -114,10 +114,10 @@ export default function App() {
     setMessage('Importando PDF…')
     try {
       const response = await fetch('/api/receipts/import', { method: 'POST', body: formData })
-      const result = await response.json() as { receipt_id?: number; duplicate?: boolean; detail?: string }
+      const result = await response.json() as { receipt_id?: number; duplicate?: boolean; warnings?: string[]; detail?: string }
       if (!response.ok) throw new Error(result.detail ?? 'No se ha podido importar el PDF.')
       await Promise.all([refresh(), loadReceipts(), loadProducts(), loadTopProducts()])
-      setMessage(result.duplicate ? 'Este PDF ya estaba importado.' : 'Ticket importado correctamente.')
+      setMessage(result.duplicate ? 'Este PDF ya estaba importado.' : result.warnings?.length ? 'Ticket importado. Revisa los avisos detectados.' : 'Ticket importado correctamente.')
       if (result.receipt_id) await showReceipt(result.receipt_id)
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No se ha podido importar el PDF.') } finally { event.target.value = '' }
   }
@@ -191,7 +191,7 @@ function SearchPanel({ results, onProduct, onReceipt }: { results: SearchResults
 }
 
 function Purchases({ receipts, selected, onSelect, onUpload, onReprocess }: { receipts: ReceiptSummary[]; selected: ReceiptDetail | null; onSelect: (id: number) => void; onUpload: (event: ChangeEvent<HTMLInputElement>) => void; onReprocess: (id: number) => void }) {
-  return <><header className="page-heading"><div><p className="eyebrow">Historial</p><h1>Compras</h1></div><label className="button upload">Importar PDF<input type="file" accept="application/pdf,.pdf" onChange={onUpload} /></label></header><div className="purchase-layout"><section className="card receipt-list">{receipts.length ? receipts.map((receipt) => <button className={selected?.id === receipt.id ? 'receipt-row selected' : 'receipt-row'} key={receipt.id} onClick={() => onSelect(receipt.id)}><span><strong>{formatMoney(receipt.total)}</strong><small>{formatDate(receipt.purchased_at)}</small></span><small>{receipt.item_count} productos</small></button>) : <p className="empty">Importa un ticket PDF para empezar.</p>}</section><ReceiptDetailPanel receipt={selected} onReprocess={onReprocess} /></div></>
+  return <><header className="page-heading"><div><p className="eyebrow">Historial</p><h1>Compras</h1></div><div className="upload-group"><label className="button upload">Importar PDF<input type="file" accept="application/pdf,.pdf" onChange={onUpload} /></label><small>Para tickets escaneados, aplica OCR en Adobe y guarda el PDF antes de subirlo.</small></div></header><div className="purchase-layout"><section className="card receipt-list">{receipts.length ? receipts.map((receipt) => <button className={selected?.id === receipt.id ? 'receipt-row selected' : 'receipt-row'} key={receipt.id} onClick={() => onSelect(receipt.id)}><span><strong>{formatMoney(receipt.total)}</strong><small>{formatDate(receipt.purchased_at)}</small></span><small>{receipt.source === 'manual' ? 'Manual' : 'Email'} · {receipt.item_count} productos{receipt.needs_review ? ' · Revisar' : ''}</small></button>) : <p className="empty">Importa un ticket PDF para empezar.</p>}</section><ReceiptDetailPanel receipt={selected} onReprocess={onReprocess} /></div></>
 }
 
 function ReceiptDetailPanel({ receipt, onReprocess }: { receipt: ReceiptDetail | null; onReprocess: (id: number) => void }) {
