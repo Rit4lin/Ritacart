@@ -7,7 +7,7 @@ Está pensada para funcionar **en local con Docker**, sin bases de datos externa
 ## Qué hace
 
 - Importa automáticamente los PDF recibidos por Gmail/IMAP.
-- También permite subir un ticket PDF manualmente.
+- También permite subir un ticket PDF manualmente, incluidos tickets escaneados que ya tengan una capa de texto OCR.
 - Guarda el histórico de compras y evita duplicados.
 - Muestra gasto total, gasto del mes y últimas compras.
 - Agrupa productos y permite renombrarlos o unir duplicados.
@@ -68,6 +68,12 @@ EMAIL_POLL_INTERVAL_MINUTES=15
 ```
 
 Si no configuras Gmail, RitaCart arranca igualmente y puedes importar los PDF manualmente desde la interfaz.
+
+### Tickets escaneados
+
+Para un ticket en papel, escanéalo y aplica OCR antes de importarlo. Por ejemplo, en Adobe Acrobat puedes usar **Escanear y OCR → Reconocer texto** y guardar el PDF resultante. Como comprobación rápida, intenta seleccionar texto o buscar `TOTAL` dentro del PDF.
+
+RitaCart no ejecuta OCR dentro del contenedor: extrae la capa de texto ya presente en el PDF, conserva el archivo original y lo procesa con el mismo historial que los tickets recibidos por email. Si el PDF no tiene texto extraíble, mostrará un aviso indicando que debes aplicar OCR. El límite de subida es de 20 MB por ticket.
 
 ## Unraid
 
