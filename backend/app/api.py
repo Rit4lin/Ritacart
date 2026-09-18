@@ -20,6 +20,7 @@ from .analytics.categories import category_analytics
 from .analytics.basket import basket_insights
 from .services.data_tools import csv_export, data_health, decimal_or_none, search
 from .services.importer import ReceiptImportError, ReceiptImportService
+from .services.pdf import MAX_RECEIPT_PDF_BYTES
 
 router = APIRouter(prefix="/api")
 
@@ -82,6 +83,7 @@ def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object
         "purchased_at": receipt.purchased_at.isoformat(),
         "total": _money(receipt.total),
         "source_filename": receipt.source_filename,
+        "source": "email" if receipt.source_message_id else "manual",
         "imported_at": receipt.imported_at.isoformat(),
         "item_count": len(receipt.items),
         "needs_review": not receipt.items or bool(json.loads(receipt.parser_warnings or "[]")),
@@ -120,9 +122,14 @@ def run_import(request: Request) -> dict[str, object]:
 
 @router.post("/receipts/import", status_code=status.HTTP_201_CREATED, tags=["receipts"])
 async def import_receipt_pdf(request: Request, file: UploadFile = File(...)) -> dict[str, object]:
-    content = await file.read()
+    try:
+        content = await file.read(MAX_RECEIPT_PDF_BYTES + 1)
+    finally:
+        await file.close()
     if not content:
         raise HTTPException(status_code=422, detail="El archivo está vacío")
+    if len(content) > MAX_RECEIPT_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="El PDF supera el límite de 20 MB")
     try:
         result = _importer(request).import_pdf(content, file.filename)
     except ReceiptImportError as exc:
@@ -360,7 +367,7 @@ def get_global_statistics(
 
 @router.get("/overview", tags=["overview"])
 def overview(request: Request) -> dict[str, object]:
-    now = datetime.now()
+    now = _local_now(request.app.state.settings.timezone)
     month_start = datetime(now.year, now.month, 1)
     with request.app.state.session_factory() as session:
         total, count = session.execute(select(func.sum(Receipt.total), func.count(Receipt.id))).one()
