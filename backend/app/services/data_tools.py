@@ -12,6 +12,19 @@ from sqlalchemy.orm import Session, selectinload
 from ..models import Product, ProductAlias, Receipt, ReceiptItem, Store
 
 
+def decode_parser_warnings(value: str | None) -> list[str]:
+    """Decode persisted parser warnings without letting malformed legacy data break the UI."""
+    if not value:
+        return []
+    try:
+        decoded = json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return ["Avisos del parser almacenados con un formato no válido"]
+    if not isinstance(decoded, list):
+        return ["Avisos del parser almacenados con un formato no válido"]
+    return [str(item) for item in decoded]
+
+
 def search(session: Session, query: str, limit: int = 10) -> dict[str, list[dict[str, object]]]:
     term = query.strip()
     if not term:
@@ -35,8 +48,9 @@ def search(session: Session, query: str, limit: int = 10) -> dict[str, list[dict
 
 def data_health(session: Session) -> dict[str, int]:
     receipts = session.scalars(select(Receipt).options(selectinload(Receipt.items))).all()
-    warnings = sum(len(json.loads(receipt.parser_warnings or "[]")) for receipt in receipts)
-    review = [receipt for receipt in receipts if not receipt.items or json.loads(receipt.parser_warnings or "[]")]
+    decoded_warnings = {receipt.id: decode_parser_warnings(receipt.parser_warnings) for receipt in receipts}
+    warnings = sum(len(values) for values in decoded_warnings.values())
+    review = [receipt for receipt in receipts if not receipt.items or decoded_warnings[receipt.id]]
     duplicate_groups = session.execute(select(Receipt.store_id, Receipt.purchased_at, Receipt.total, func.count(Receipt.id)).group_by(Receipt.store_id, Receipt.purchased_at, Receipt.total).having(func.count(Receipt.id) > 1)).all()
     return {"total_receipts": len(receipts), "total_receipt_items": sum(len(receipt.items) for receipt in receipts), "total_products": session.scalar(select(func.count(Product.id))) or 0, "uncategorized_products": session.scalar(select(func.count(Product.id)).where(Product.category_id.is_(None))) or 0, "receipts_needing_review": len(review), "receipts_without_items": sum(not receipt.items for receipt in receipts), "possible_duplicate_receipts": len(duplicate_groups), "parser_warning_count": warnings}
 

@@ -7,13 +7,14 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from email import message_from_bytes
 from email.message import Message
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from ..config import Settings
 from ..models import Product, ProductAlias, Receipt, ReceiptItem, ReceiptVat, Store
@@ -95,6 +96,10 @@ class ReceiptImportService:
                 parsed = self.parser.parse(extracted_text)
             except (PdfExtractionError, ValueError) as exc:
                 raise ReceiptImportError(str(exc)) from exc
+
+            semantic_duplicate = self._find_semantic_duplicate(session, parsed)
+            if semantic_duplicate is not None:
+                return self._duplicate_result(session, semantic_duplicate)
 
             pdf_path = self._save_pdf(pdf_bytes, file_hash)
             store = self._get_or_create_store(session)
@@ -248,6 +253,67 @@ class ReceiptImportService:
         if not filename:
             return "receipt.pdf"
         return Path(filename).name.replace("\x00", "")[:512] or "receipt.pdf"
+
+    def _find_semantic_duplicate(
+        self,
+        session: Session,
+        parsed: ParsedReceipt,
+    ) -> Receipt | None:
+        """Find the same purchase even when a new OCR pass changes the PDF bytes."""
+        candidates = session.scalars(
+            select(Receipt)
+            .join(Receipt.store)
+            .options(selectinload(Receipt.items))
+            .where(
+                Store.slug == "mercadona",
+                Receipt.purchased_at == parsed.purchased_at,
+                Receipt.total == parsed.total,
+            )
+        ).all()
+        parsed_signature = self._parsed_item_signature(parsed.items)
+        return next(
+            (
+                receipt
+                for receipt in candidates
+                if self._stored_item_signature(receipt.items) == parsed_signature
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _signature_decimal(value: object | None) -> str:
+        if value is None:
+            return ""
+        decimal_value = Decimal(str(value))
+        if decimal_value == 0:
+            return "0"
+        return format(decimal_value.normalize(), "f")
+
+    @classmethod
+    def _parsed_item_signature(cls, items: list[ParsedReceiptItem]) -> tuple[tuple[str, str, str], ...]:
+        return tuple(
+            sorted(
+                (
+                    item.raw_name.casefold().strip(),
+                    cls._signature_decimal(item.quantity),
+                    cls._signature_decimal(item.total_price),
+                )
+                for item in items
+            )
+        )
+
+    @classmethod
+    def _stored_item_signature(cls, items: list[ReceiptItem]) -> tuple[tuple[str, str, str], ...]:
+        return tuple(
+            sorted(
+                (
+                    item.raw_name.casefold().strip(),
+                    cls._signature_decimal(item.quantity),
+                    cls._signature_decimal(item.total_price),
+                )
+                for item in items
+            )
+        )
 
     @staticmethod
     def _get_or_create_store(session: Session) -> Store:
