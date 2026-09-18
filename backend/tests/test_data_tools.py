@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.models import Receipt
+
 from conftest import make_pdf
 
 
@@ -34,3 +36,24 @@ def test_bulk_categories_is_atomic(client) -> None:
     assert client.patch("/api/products/categories", json={"product_ids": [product_id, 999], "category_id": category_id}).status_code == 422
     assert client.get("/api/products").json()[0]["category"] is None
     assert client.patch("/api/products/categories", json={"product_ids": [product_id], "category_id": category_id}).json() == {"updated_products": 1}
+
+
+def test_malformed_stored_parser_warnings_do_not_break_receipt_views(client) -> None:
+    receipt_id = _import_receipt(client)
+    with client.app.state.session_factory() as session:
+        receipt = session.get(Receipt, receipt_id)
+        assert receipt is not None
+        receipt.parser_warnings = "{broken-json"
+        session.commit()
+
+    detail = client.get(f"/api/receipts/{receipt_id}")
+    assert detail.status_code == 200
+    assert detail.json()["needs_review"] is True
+    assert detail.json()["parser_warnings"] == [
+        "Avisos del parser almacenados con un formato no válido"
+    ]
+
+    health = client.get("/api/data-health")
+    assert health.status_code == 200
+    assert health.json()["receipts_needing_review"] == 1
+    assert health.json()["parser_warning_count"] == 1
