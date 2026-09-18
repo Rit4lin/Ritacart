@@ -18,7 +18,7 @@ from .analytics.statistics import global_statistics
 from .analytics.statistics import _local_now
 from .analytics.categories import category_analytics
 from .analytics.basket import basket_insights
-from .services.data_tools import csv_export, data_health, decimal_or_none, search
+from .services.data_tools import csv_export, data_health, decimal_or_none, decode_parser_warnings, search
 from .services.importer import ReceiptImportError, ReceiptImportService
 from .services.pdf import MAX_RECEIPT_PDF_BYTES
 
@@ -86,12 +86,12 @@ def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object
         "source": "email" if receipt.source_message_id else "manual",
         "imported_at": receipt.imported_at.isoformat(),
         "item_count": len(receipt.items),
-        "needs_review": not receipt.items or bool(json.loads(receipt.parser_warnings or "[]")),
+        "needs_review": not receipt.items or bool(decode_parser_warnings(receipt.parser_warnings)),
     }
     if detail:
         payload["items"] = [_item_payload(item) for item in receipt.items]
         payload["vat_breakdown"] = [_vat_payload(vat) for vat in receipt.vat_breakdown]
-        payload["parser_warnings"] = json.loads(receipt.parser_warnings or "[]")
+        payload["parser_warnings"] = decode_parser_warnings(receipt.parser_warnings)
         payload["source_extracted_text"] = receipt.source_extracted_text
     return payload
 
