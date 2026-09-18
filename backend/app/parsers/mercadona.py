@@ -19,6 +19,9 @@ _TOTAL_LABEL_RE = re.compile(
 _UNIT_ITEM_RE = re.compile(
     r"^(\d+(?:[,.]\d+)?)\s+(.+?)\s+(\d+[,.]\d{2})\s+(\d+[,.]\d{2})$"
 )
+_UNIT_ITEM_SINGLE_PRICE_RE = re.compile(
+    r"^(\d+)\s+(.+?)\s+(\d+[,.]\d{2})$"
+)
 _WEIGHT_ITEM_RE = re.compile(
     r"^(\d+(?:[,.]\d+)?)\s*(kg|g)\s*(?:x|@)?\s*"
     r"(\d+[,.]\d{2})\s*(?:[^\w\s/])?\s*/?\s*(kg|g)\s+(\d+[,.]\d{2})$",
@@ -44,7 +47,7 @@ def _decimal(value: str) -> Decimal:
 
 
 class MercadonaParser:
-    """Deterministic parser for the embedded text of Mercadona digital receipts."""
+    """Deterministic parser for Mercadona PDFs, including OCR text layers."""
 
     def parse(self, text: str) -> ParsedReceipt:
         lines = [" ".join(line.split()) for line in text.splitlines() if line.strip()]
@@ -56,6 +59,7 @@ class MercadonaParser:
         items, warnings = self._parse_items(lines)
         if not items:
             raise ReceiptParseError("No se ha podido interpretar ninguna línea de producto")
+        warnings.extend(self._consistency_warnings(items, total))
         vat_breakdown = self._parse_vat_breakdown(lines)
         return ParsedReceipt(
             purchased_at=purchased_at,
@@ -74,7 +78,7 @@ class MercadonaParser:
         if not time_text:
             time_match = _TIME_RE.search(joined)
             time_text = time_match.group(1) if time_match else "00:00"
-        for format_string in ("%d/%m/%Y %H:%M", "%d-%m-%Y %H:%M"):
+        for format_string in ("%d/%m/%Y %H:%M", "%d-%m-%Y %H:%M", "%d.%m.%Y %H:%M"):
             try:
                 return datetime.strptime(f"{date_text} {time_text}", format_string)
             except ValueError:
@@ -140,6 +144,24 @@ class MercadonaParser:
                     )
                 )
                 consumed.add(index)
+                continue
+
+            single_price_item = _UNIT_ITEM_SINGLE_PRICE_RE.match(line)
+            if single_price_item and not self._is_metadata(line):
+                quantity, name, line_total = single_price_item.groups()
+                total_price = _decimal(line_total)
+                items.append(
+                    ParsedReceiptItem(
+                        raw_name=name,
+                        quantity=_decimal(quantity),
+                        unit="ud",
+                        unit_price=total_price if _decimal(quantity) == Decimal("1") else None,
+                        price_per_kg=None,
+                        total_price=total_price,
+                        raw_text=line,
+                    )
+                )
+                consumed.add(index)
 
         for index, line in enumerate(lines):
             if index in consumed or self._is_metadata(line) or _TOTAL_RE.search(line):
@@ -179,6 +201,42 @@ class MercadonaParser:
         for index, line in enumerate(lines):
             if index in consumed:
                 continue
+
+            inline_item = _UNIT_ITEM_RE.fullmatch(line)
+            if inline_item:
+                quantity, name, unit_price, line_total = inline_item.groups()
+                items.append(
+                    ParsedReceiptItem(
+                        raw_name=name,
+                        quantity=_decimal(quantity),
+                        unit="ud",
+                        unit_price=_decimal(unit_price),
+                        price_per_kg=None,
+                        total_price=_decimal(line_total),
+                        raw_text=line,
+                    )
+                )
+                consumed.add(index)
+                continue
+
+            inline_single = _UNIT_ITEM_SINGLE_PRICE_RE.fullmatch(line)
+            if inline_single:
+                quantity, name, line_total = inline_single.groups()
+                total_price = _decimal(line_total)
+                items.append(
+                    ParsedReceiptItem(
+                        raw_name=name,
+                        quantity=_decimal(quantity),
+                        unit="ud",
+                        unit_price=total_price if _decimal(quantity) == Decimal("1") else None,
+                        price_per_kg=None,
+                        total_price=total_price,
+                        raw_text=line,
+                    )
+                )
+                consumed.add(index)
+                continue
+
             product_match = _PRODUCT_LINE_RE.match(line)
             if not product_match:
                 continue
@@ -237,6 +295,23 @@ class MercadonaParser:
         return items, warnings
 
     @staticmethod
+    def _consistency_warnings(
+        items: list[ParsedReceiptItem], total: Decimal
+    ) -> list[str]:
+        line_totals = [item.total_price for item in items if item.total_price is not None]
+        if len(line_totals) != len(items):
+            return []
+        observed = sum(line_totals, Decimal("0"))
+        difference = abs(observed - total)
+        if difference <= Decimal("0.05"):
+            return []
+        return [
+            "La suma de las líneas "
+            f"({observed.quantize(Decimal('0.01'))} €) no coincide con el total "
+            f"del ticket ({total.quantize(Decimal('0.01'))} €). Revisa el OCR."
+        ]
+
+    @staticmethod
     def _parse_vat_breakdown(lines: list[str]) -> list[ParsedReceiptVat]:
         vat_start = next((index for index, line in enumerate(lines) if line.upper() == "IVA"), None)
         if vat_start is None:
@@ -263,4 +338,4 @@ class MercadonaParser:
 
     @staticmethod
     def _is_item_heading(line: str) -> bool:
-        return line.casefold() in {"p. unit", "importe"}
+        return line.casefold().rstrip(".") in {"p. unit", "p unit", "importe"}
