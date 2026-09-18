@@ -6,7 +6,7 @@ import json
 import logging
 import threading
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from email import message_from_bytes
 from email.message import Message
 from pathlib import Path
@@ -128,30 +128,41 @@ class ReceiptImportService:
             )
 
     def reprocess_receipt(self, receipt_id: int) -> ImportResult:
-        """Rebuild normalized observations from the preserved extracted receipt text."""
+        """Re-extract the preserved PDF and rebuild its normalized observations."""
         with self.session_factory() as session:
             receipt = session.get(Receipt, receipt_id)
             if receipt is None:
                 raise ReceiptImportError("Ticket no encontrado")
-            if not receipt.source_extracted_text:
-                raise ReceiptImportError("El ticket no conserva texto extraído para reprocesarlo")
+
+            pdf_path = self.settings.app_data_dir / "receipts" / f"{receipt.source_file_hash}.pdf"
             try:
-                parsed = self.parser.parse(receipt.source_extracted_text)
-            except ValueError as exc:
+                if pdf_path.is_file():
+                    extracted_text = extract_text(pdf_path.read_bytes())
+                elif receipt.source_extracted_text:
+                    extracted_text = receipt.source_extracted_text
+                else:
+                    raise ReceiptImportError(
+                        "El ticket no conserva ni el PDF original ni texto extraído para reprocesarlo"
+                    )
+                parsed = self.parser.parse(extracted_text)
+            except (OSError, PdfExtractionError, ValueError) as exc:
+                if isinstance(exc, ReceiptImportError):
+                    raise
                 raise ReceiptImportError(str(exc)) from exc
 
+            receipt.source_extracted_text = extracted_text
             self._replace_normalized_data(session, receipt, parsed)
             session.commit()
             return ImportResult(
                 receipt.id,
                 imported=True,
                 duplicate=False,
-                warnings=parsed.warnings
+                warnings=parsed.warnings,
             )
 
     def run_imap_import(self) -> int:
         """Fetch configured Mercadona PDF attachments once, without marking mail read."""
-        started_at = datetime.utcnow()
+        started_at = datetime.now(UTC)
         self._set_status(last_run=started_at, imported_receipts_last_run=0, last_error=None)
         if not self.settings.email_enabled:
             logger.info("Email importer disabled: EMAIL_USERNAME or EMAIL_PASSWORD is not configured")
@@ -179,7 +190,7 @@ class ReceiptImportService:
             logger.exception("IMAP receipt import failed")
             raise ReceiptImportError(str(exc)) from exc
 
-        completed_at = datetime.utcnow()
+        completed_at = datetime.now(UTC)
         self._set_status(
             last_success=completed_at,
             last_error=None,
