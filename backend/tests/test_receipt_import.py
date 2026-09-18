@@ -41,6 +41,31 @@ def test_pdf_hash_duplicate_is_idempotent(client, receipt_pdf) -> None:
     assert len(client.get("/api/receipts").json()) == 1
 
 
+def test_same_receipt_with_different_ocr_pdf_bytes_is_not_duplicated(client) -> None:
+    first_pdf = make_pdf(
+        "MERCADONA\n01/08/2026 14:30\n1 PAN DE MOLDE 1,25 1,25\nTOTAL 1,25\n"
+    )
+    second_pdf = make_pdf(
+        "MERCADONA\n01/08/2026 14:30\n1 PAN DE MOLDE 1,25 1,25\nGRACIAS\nTOTAL 1,25\n"
+    )
+
+    first = client.post(
+        "/api/receipts/import",
+        files={"file": ("scan-ocr-1.pdf", first_pdf, "application/pdf")},
+    )
+    second = client.post(
+        "/api/receipts/import",
+        files={"file": ("scan-ocr-2.pdf", second_pdf, "application/pdf")},
+    )
+
+    assert first.status_code == 201
+    assert first.json()["imported"] is True
+    assert second.status_code == 201
+    assert second.json()["duplicate"] is True
+    assert second.json()["receipt_id"] == first.json()["receipt_id"]
+    assert len(client.get("/api/receipts").json()) == 1
+
+
 def test_message_id_duplicate_is_idempotent(client, receipt_pdf) -> None:
     importer = client.app.state.importer
     first = importer.import_pdf(receipt_pdf, "one.pdf", "<mail-1@example.test>", 0)
