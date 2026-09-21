@@ -56,6 +56,28 @@ def test_mercadona_parser_handles_column_layout_and_vat_breakdown() -> None:
     ]
 
 
+def test_mercadona_parser_handles_weighted_column_values_on_one_line() -> None:
+    parsed = MercadonaParser().parse(
+        """MERCADONA
+21/09/2026 13:33
+Cnt. Descripción P. Unit Importe
+1 ARÁNDANO 225 GR 3,35
+1 PIMIENTO FREÍR
+0,922 kg 2,50 €/kg 2,31
+TOTAL (€)
+5,66
+"""
+    )
+
+    weighted_item = parsed.items[1]
+    assert weighted_item.raw_name == "PIMIENTO FREÍR"
+    assert weighted_item.quantity == Decimal("0.922")
+    assert weighted_item.unit == "kg"
+    assert weighted_item.price_per_kg == Decimal("2.50")
+    assert weighted_item.total_price == Decimal("2.31")
+    assert parsed.warnings == []
+
+
 def test_mercadona_parser_keeps_plain_description_header_compatible() -> None:
     parsed = MercadonaParser().parse(
         COLUMN_LAYOUT_RECEIPT_TEXT.replace("Cnt. Descripción", "Descripción")

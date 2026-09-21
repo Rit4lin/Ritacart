@@ -242,6 +242,24 @@ class MercadonaParser:
                 continue
             quantity, name = product_match.groups()
 
+            if index + 1 < len(lines):
+                weighted_inline = _WEIGHT_ITEM_RE.fullmatch(lines[index + 1])
+                if weighted_inline:
+                    weight, unit, price_per_kg, _, line_total = weighted_inline.groups()
+                    items.append(
+                        ParsedReceiptItem(
+                            raw_name=name,
+                            quantity=_decimal(weight),
+                            unit=unit.lower(),
+                            unit_price=None,
+                            price_per_kg=_decimal(price_per_kg),
+                            total_price=_decimal(line_total),
+                            raw_text="\n".join(lines[index : index + 2]),
+                        )
+                    )
+                    consumed.update({index, index + 1})
+                    continue
+
             if index + 3 < len(lines):
                 weight_match = _WEIGHT_QUANTITY_RE.fullmatch(lines[index + 1])
                 price_per_weight_match = _PRICE_PER_WEIGHT_RE.fullmatch(lines[index + 2])
