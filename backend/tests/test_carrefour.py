@@ -6,6 +6,7 @@ import pytest
 from app.parsers.base import ReceiptParseError
 from app.parsers.carrefour import CarrefourParser
 from app.services.pdf import _normalise_text
+from app.services.importer import ReceiptImportError
 from conftest import make_pdf
 
 
@@ -171,9 +172,30 @@ NRF: TEST-NRF-123
     again = client.post('/api/receipts/import', files={'file': ('renamed.pdf', make_pdf(content), 'application/pdf')})
     assert again.json()['duplicate'] is True
     assert again.json()['receipt_id'] == receipt_id
+    # Distinct bytes with the same unique NRF must also be recognised as the same receipt.
+    rewritten = make_pdf(content + '\nExportación alternativa')
+    same_nrf = client.post('/api/receipts/import', files={'file': ('alternative.pdf', rewritten, 'application/pdf')})
+    assert same_nrf.json()['duplicate'] is True
+    assert same_nrf.json()['receipt_id'] == receipt_id
     assert client.post(f'/api/receipts/{receipt_id}/reprocess').status_code == 200
     assert client.get(f'/api/receipts/{receipt_id}').json()['store'] == 'Carrefour'
 
     mercadona = client.post('/api/receipts/import', files={'file': ('mercadona.pdf', receipt_pdf, 'application/pdf')})
     assert mercadona.status_code == 201, mercadona.text
     assert client.get(f"/api/receipts/{mercadona.json()['receipt_id']}").json()['store'] == 'Mercadona'
+
+
+def test_carrefour_must_never_be_imported_from_email(client):
+    content = """***Centros Comerciales Carrefour S.A***
+**************************************
+PAN 0,99
+1 ART. TOTAL A PAGAR : 0,99
+08/10/2026 12:15:00
+NRF: TEST-EMAIL-REF
+"""
+    with pytest.raises(ReceiptImportError, match='solo está permitida para Mercadona'):
+        client.app.state.importer.import_pdf(
+            make_pdf(content), 'carrefour.pdf',
+            source_message_id='<test-email@example.invalid>', source_attachment_index=0,
+        )
+    assert client.get('/api/receipts').json() == []
