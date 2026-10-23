@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 (propuesta de versión, pendiente de publicar)
+## 2.0.0 (23 de octubre de 2026)
 
 **Nueva compatibilidad:** tickets PDF de Carrefour, importados solo manualmente desde la pantalla Compras. Los tickets Mercadona mantienen su importación por IMAP y manual.
 
@@ -25,4 +25,4 @@
 ### Verificación
 - Pruebas del parser con dos casos completos sanitizados, descuentos y aritmética.
 - Pruebas de API y regresión de Mercadona; comprobaciones de compilación TypeScript y frontend mediante GitHub Actions.
-- **No se publica imagen Docker, etiqueta de versión ni release con esta PR.** La publicación y el despliegue requieren un paso posterior.
+- La publicación de la imagen `:latest` y `:v2.0.0`, junto con la release de GitHub, se realiza tras fusionar esta PR y superar el workflow de publicación. No hay despliegue automático en Unraid.
