@@ -233,3 +233,42 @@ def test_existing_sqlite_receipts_survive_additive_v2_upgrade(client, receipt_pd
     assert data['store'] == 'Mercadona'
     assert data['total'] == '3.25'
     assert len(data['items']) == 2
+
+
+def test_carrefour_discount_fields_persist_and_export(client):
+    receipt_text = """***Centros Comerciales Carrefour S.A***
+**************************************
+ARROZ THAI DF02
+2 x ( 4,05 ) 8,10
+DESCUENTO EN 2A UNIDAD DF02 -2,03
+SUBTOTAL 6,07
+DTO. CUPON 1X5 EUR -1,00
+2 ART. TOTAL A PAGAR : 5,07
+TIPO BASE CUOTA
+10,00% 4,61 0,46
+23/10/2026 10:15:00
+NRF: TEST-DISCOUNT-REF
+"""
+    response = client.post('/api/receipts/import', files={
+        'file': ('promotion.pdf', make_pdf(receipt_text), 'application/pdf')
+    })
+    assert response.status_code == 201, response.text
+    assert response.json()['warnings'] == []
+    receipt_id = response.json()['receipt_id']
+    record = client.get(f'/api/receipts/{receipt_id}').json()
+    assert record['total'] == '5.07'
+    assert record['subtotal'] == '6.07'
+    assert record['line_discount_total'] == '2.03'
+    assert record['adjustments'][0]['amount'] == '-1.00'
+    assert record['items'][0]['unit_price'] == '4.0500'
+    assert record['items'][0]['gross_total_price'] == '8.10'
+    assert record['items'][0]['discount_amount'] == '2.03'
+    assert record['items'][0]['total_price'] == '6.07'
+    items_csv = client.get('/api/export/items.csv').text
+    receipts_csv = client.get('/api/export/receipts.csv').text
+    assert 'gross_total_price;discount_amount' in items_csv
+    assert '8.10;2.03' in items_csv
+    assert 'receipt_reference;general_discounts' in receipts_csv
+    assert 'TEST-DISCOUNT-REF' in receipts_csv
+    assert client.post(f'/api/receipts/{receipt_id}/reprocess').status_code == 200
+    assert client.get(f'/api/receipts/{receipt_id}').json()['line_discount_total'] == '2.03'
