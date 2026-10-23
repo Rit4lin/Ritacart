@@ -59,7 +59,7 @@ Solo se han verificado directamente los formatos de los tickets Carrefour de **6
 
 El esquema SQLite se amplía automáticamente al arrancar, manteniendo los tickets de Mercadona existentes. Antes de actualizar el contenedor, haz una copia de seguridad del directorio persistente `/data`, incluyendo la base SQLite y posibles archivos WAL/SHM. No mezcles procesos ejecutando simultáneamente las versiones antigua y nueva sobre el mismo volumen.
 
-**Versión en preparación:** los cambios de 2.0.0 se desarrollan mediante pull request. Este documento no implica que `ghcr.io/rit4lin/ritacart:latest` ya incluya Carrefour.
+**Publicación:** RitaCart 2.0.0 se distribuye mediante `ghcr.io/rit4lin/ritacart:latest` y la etiqueta fija `ghcr.io/rit4lin/ritacart:v2.0.0`. Una vez publicada la imagen, en Unraid selecciona **Docker → Check for Updates**, descarga la actualización y recrea el contenedor **conservando la misma ruta persistente `/data`**. Si tu plantilla utiliza una etiqueta fija anterior, cambia el repositorio a `ghcr.io/rit4lin/ritacart:v2.0.0` para instalarla; con `:latest`, no cambies la plantilla. Comprueba en la aplicación que la versión es 2.0.0 y que el histórico de Mercadona continúa disponible.
 
 ## Gmail
 
