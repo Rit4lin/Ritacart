@@ -46,6 +46,26 @@ def initialise_database(engine: Engine) -> None:
                 connection.execute(
                     text("ALTER TABLE receipts ADD COLUMN source_extracted_text TEXT NOT NULL DEFAULT ''")
                 )
+    if "receipts" in inspector.get_table_names():
+        receipt_columns = {column["name"] for column in inspector.get_columns("receipts")}
+        with engine.begin() as connection:
+            if "subtotal" not in receipt_columns:
+                connection.execute(text("ALTER TABLE receipts ADD COLUMN subtotal NUMERIC(12, 2)"))
+            if "reference" not in receipt_columns:
+                connection.execute(text("ALTER TABLE receipts ADD COLUMN reference VARCHAR(120)"))
+            connection.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_receipt_store_reference "
+                "ON receipts (store_id, reference)"
+            ))
+    if "receipt_items" in inspector.get_table_names():
+        item_columns = {column["name"] for column in inspector.get_columns("receipt_items")}
+        with engine.begin() as connection:
+            if "gross_total_price" not in item_columns:
+                connection.execute(text("ALTER TABLE receipt_items ADD COLUMN gross_total_price NUMERIC(12, 2)"))
+            if "discount_amount" not in item_columns:
+                connection.execute(text(
+                    "ALTER TABLE receipt_items ADD COLUMN discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0"
+                ))
     if "products" in inspector.get_table_names():
         columns = {column["name"] for column in inspector.get_columns("products")}
         if "category_id" not in columns:

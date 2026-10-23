@@ -1,18 +1,19 @@
-# RitaCart
+# RitaCart 2.0.0
 
 RitaCart analiza automáticamente los tickets digitales del supermercado para convertirlos en un historial útil de compras, productos y precios.
 
-Está pensada para funcionar **en local con Docker**, sin bases de datos externas ni servicios adicionales. Actualmente está enfocada en los tickets digitales de **Mercadona**.
+Está pensada para funcionar **en local con Docker**, sin bases de datos externas ni servicios adicionales. Desde la versión **2.0.0** es compatible con **Mercadona** y **Carrefour**. Mercadona admite importación automática por IMAP y manual; Carrefour solo mediante subida manual.
 
 ## Qué hace
 
-- Importa automáticamente los PDF recibidos por Gmail/IMAP.
-- También permite subir un ticket PDF manualmente, incluidos tickets escaneados que ya tengan una capa de texto OCR.
-- Guarda el histórico de compras y evita duplicados.
+- Importa automáticamente los PDF de Mercadona recibidos por Gmail/IMAP. Carrefour no se busca ni descarga por correo.
+- Permite subir manualmente tickets PDF de Mercadona y Carrefour, incluidos los escaneados con capa OCR.
+- Detecta el supermercado por el encabezado, guarda el histórico de compras y evita duplicados (incluido NRF en Carrefour).
 - Muestra gasto total, gasto del mes y últimas compras.
 - Agrupa productos y permite renombrarlos o unir duplicados.
 - Muestra frecuencia de compra, cantidades y evolución de precios.
 - Conserva los PDF originales y los datos en una base SQLite local.
+- En Carrefour conserva precios originales, descuentos por artículo, cupones globales, subtotales e IVA; las promociones no se convierten en productos.
 
 ## Instalar con Docker
 
@@ -43,6 +44,22 @@ http://IP_DEL_SERVIDOR:8000
 ```
 
 Todo lo importante queda guardado en `/data`, incluida la base de datos y los PDF. Para hacer una copia de seguridad basta con respaldar ese directorio.
+
+## Importar tickets de Carrefour (solo manual)
+
+En **Compras → Importar PDF** selecciona el ticket digital de Carrefour. RitaCart detecta automáticamente la tienda. No hay conexión con Carrefour, scraping, correo adicional ni importación en segundo plano.
+
+El parser reconoce las líneas con cantidades tipo `2 x (4,05) 8,10`, promociones `DESCUENTO EN 2ª UNIDAD` por código, cupones `DTO. CUPON`, cheques `DTO. CHEQUE AHORRO`, los tipos de IVA y el identificador `NRF`. El precio original por unidad se conserva para observar la evolución de precios; el gasto del producto refleja el descuento de línea y el importe total de la compra incluye los cupones generales.
+
+Algunos artículos de fruta o granel solo presentan un importe en el ticket, sin peso. RitaCart **no calcula ni inventa €/kg** para esos casos: la cantidad `ud` representa el artículo registrado en el ticket y no el peso real. Si el formato no cuadra, mostrará avisos para revisión.
+
+Solo se han verificado directamente los formatos de los tickets Carrefour de **6 y 22 de octubre de 2026**. Otros modelos de Carrefour pueden requerir extender el parser. La subida de PDF sigue limitada a 20 MB y 20 páginas.
+
+## Actualización a 2.0.0
+
+El esquema SQLite se amplía automáticamente al arrancar, manteniendo los tickets de Mercadona existentes. Antes de actualizar el contenedor, haz una copia de seguridad del directorio persistente `/data`, incluyendo la base SQLite y posibles archivos WAL/SHM. No mezcles procesos ejecutando simultáneamente las versiones antigua y nueva sobre el mismo volumen.
+
+**Publicación:** RitaCart 2.0.0 se distribuye mediante `ghcr.io/rit4lin/ritacart:latest` y la etiqueta fija `ghcr.io/rit4lin/ritacart:v2.0.0`. Una vez publicada la imagen, en Unraid selecciona **Docker → Check for Updates**, descarga la actualización y recrea el contenedor **conservando la misma ruta persistente `/data`**. Si tu plantilla utiliza una etiqueta fija anterior, cambia el repositorio a `ghcr.io/rit4lin/ritacart:v2.0.0` para instalarla; con `:latest`, no cambies la plantilla. Comprueba en la aplicación que la versión es 2.0.0 y que el histórico de Mercadona continúa disponible.
 
 ## Gmail
 

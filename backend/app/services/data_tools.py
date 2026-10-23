@@ -71,14 +71,14 @@ def csv_export(session: Session, kind: str) -> str:
     output = io.StringIO(newline="")
     writer = csv.writer(output, delimiter=";")
     if kind == "receipts":
-        writer.writerow(["receipt_id", "purchased_at", "store", "total", "source_filename"])
-        for receipt in session.scalars(select(Receipt).options(selectinload(Receipt.store)).order_by(Receipt.purchased_at)):
-            writer.writerow([receipt.id, receipt.purchased_at.isoformat(), receipt.store.name, receipt.total, receipt.source_filename])
+        writer.writerow(["receipt_id", "purchased_at", "store", "total", "source_filename", "subtotal", "receipt_reference", "general_discounts"])
+        for receipt in session.scalars(select(Receipt).options(selectinload(Receipt.store), selectinload(Receipt.adjustments)).order_by(Receipt.purchased_at)):
+            writer.writerow([receipt.id, receipt.purchased_at.isoformat(), receipt.store.name, receipt.total, receipt.source_filename, receipt.subtotal or "", receipt.reference or "", sum((adj.amount for adj in receipt.adjustments), Decimal("0"))])
     elif kind == "items":
-        writer.writerow(["receipt_id", "purchased_at", "store", "product_id", "product_name", "category", "raw_description", "quantity", "unit", "unit_price", "price_per_kg", "total_price"])
+        writer.writerow(["receipt_id", "purchased_at", "store", "product_id", "product_name", "category", "raw_description", "quantity", "unit", "unit_price", "price_per_kg", "total_price", "gross_total_price", "discount_amount"])
         items = session.scalars(select(ReceiptItem).options(selectinload(ReceiptItem.receipt).selectinload(Receipt.store), selectinload(ReceiptItem.product).selectinload(Product.category))).all()
         for item in items:
-            writer.writerow([item.receipt_id, item.receipt.purchased_at.isoformat(), item.receipt.store.name, item.product_id, item.product.name if item.product else "", item.product.category.name if item.product and item.product.category else "", item.raw_name, item.quantity or "", item.unit or "", item.unit_price or "", item.price_per_kg or "", item.total_price or ""])
+            writer.writerow([item.receipt_id, item.receipt.purchased_at.isoformat(), item.receipt.store.name, item.product_id, item.product.name if item.product else "", item.product.category.name if item.product and item.product.category else "", item.raw_name, item.quantity or "", item.unit or "", item.unit_price or "", item.price_per_kg or "", item.total_price or "", item.gross_total_price or "", item.discount_amount])
     elif kind == "products":
         writer.writerow(["product_id", "name", "category"])
         for product in session.scalars(select(Product).options(selectinload(Product.category)).order_by(Product.name)):

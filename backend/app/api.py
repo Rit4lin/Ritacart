@@ -63,6 +63,8 @@ def _item_payload(item: ReceiptItem) -> dict[str, object]:
         "unit_price": _money(item.unit_price),
         "price_per_kg": _money(item.price_per_kg),
         "total_price": _money(item.total_price),
+        "gross_total_price": _money(item.gross_total_price),
+        "discount_amount": _money(item.discount_amount),
         "raw_text": item.raw_text,
     }
 
@@ -81,6 +83,8 @@ def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object
         "store": receipt.store.name,
         "purchased_at": receipt.purchased_at.isoformat(),
         "total": _money(receipt.total),
+        "subtotal": _money(receipt.subtotal),
+        "reference": receipt.reference,
         "source_filename": receipt.source_filename,
         "source": "email" if receipt.source_message_id else "manual",
         "imported_at": receipt.imported_at.isoformat(),
@@ -90,6 +94,13 @@ def _receipt_payload(receipt: Receipt, detail: bool = False) -> dict[str, object
     if detail:
         payload["items"] = [_item_payload(item) for item in receipt.items]
         payload["vat_breakdown"] = [_vat_payload(vat) for vat in receipt.vat_breakdown]
+        payload["adjustments"] = [
+            {"label": adj.label, "amount": _money(adj.amount), "raw_text": adj.raw_text}
+            for adj in receipt.adjustments
+        ]
+        payload["line_discount_total"] = _money(sum(
+            (item.discount_amount for item in receipt.items), Decimal("0")
+        ))
         payload["parser_warnings"] = decode_parser_warnings(receipt.parser_warnings)
         payload["source_extracted_text"] = receipt.source_extracted_text
     return payload
@@ -161,6 +172,7 @@ def get_receipt(receipt_id: int, request: Request) -> dict[str, object]:
                 selectinload(Receipt.items),
                 selectinload(Receipt.store),
                 selectinload(Receipt.vat_breakdown),
+                selectinload(Receipt.adjustments),
             )
             .where(Receipt.id == receipt_id)
         )
