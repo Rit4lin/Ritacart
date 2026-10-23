@@ -52,6 +52,12 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
+      - name: Read release version
+        id: version
+        run: |
+          VERSION=$(python -c 'import json; print(json.load(open("frontend/package.json"))["version"])')
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -71,6 +77,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=tag
+            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
@@ -87,3 +94,30 @@ jobs:
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  release:
+    name: GitHub release
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Create a versioned GitHub release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(python -c 'import json; print(json.load(open("frontend/package.json"))["version"])')
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub release $TAG already exists; keeping it unchanged."
+            exit 0
+          fi
+          gh release create "$TAG" --target "$GITHUB_SHA" \
+            --title "RitaCart ${VERSION}" \
+            --notes-file CHANGELOG.md
