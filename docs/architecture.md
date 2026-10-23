@@ -44,6 +44,7 @@ backend/
     parsers/
       base.py
       mercadona.py
+      carrefour.py
     analytics/
     main.py
   tests/
@@ -75,6 +76,8 @@ Suggested fields:
 - slug
 
 ### Receipt
+
+In version 2.0, receipts also carry an optional Carrefour reference (NRF, unique per store) and pre-coupon subtotal. Duplicate detection must always be scoped to the detected store.
 
 Represents one shopping trip/ticket.
 
@@ -116,6 +119,9 @@ A unique constraint on `(store_id, raw_name)` is likely appropriate.
 
 ### ReceiptItem
 
+In version 2.0, receipt items record optional gross_total_price and a non-negative discount_amount; total_price is the net line amount after discounts. The original unit_price is preserved for regular-price analytics. ReceiptAdjustment stores invoice-level signed discounts such as coupons, independently of products.
+
+
 One product observation on one receipt.
 
 Suggested fields:
@@ -142,7 +148,7 @@ Not every field applies to every product. Weighted and unit products must remain
 5. Reject already-imported files
 6. Store original PDF
 7. Extract embedded text
-8. Detect supermarket/parser
+8. Detect supermarket/parser (Mercadona and Carrefour)
 9. Parse receipt metadata and lines
 10. Persist raw observations
 11. Apply known ProductAlias mappings
@@ -150,6 +156,10 @@ Not every field applies to every product. Weighted and unit products must remain
 ```
 
 Importing the same message/file repeatedly must be safe and must not create duplicates.
+
+## Carrefour parser
+
+Carrefour is a **manual-only** import source, detected from the header of the submitted PDF. Its parser reads the numbered articles, multi-unit groups, coupon codes attached to products, invoice-level discounts, the VAT breakdown, date/time and the NRF reference. It reconciles gross item totals, line discounts, subtotal, coupons and the final paid amount; unmatched or inconsistent entries produce review warnings. No scraper, Carrefour mailbox poller or Carrefour authentication is added.
 
 ## Mercadona parser
 
