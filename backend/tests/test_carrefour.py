@@ -7,6 +7,8 @@ from app.parsers.base import ReceiptParseError
 from app.parsers.carrefour import CarrefourParser
 from app.services.pdf import _normalise_text
 from app.services.importer import ReceiptImportError
+from app.database import initialise_database
+from sqlalchemy import inspect
 from conftest import make_pdf
 
 
@@ -199,3 +201,35 @@ NRF: TEST-EMAIL-REF
             source_message_id='<test-email@example.invalid>', source_attachment_index=0,
         )
     assert client.get('/api/receipts').json() == []
+
+
+def test_existing_sqlite_receipts_survive_additive_v2_upgrade(client, receipt_pdf):
+    imported = client.post(
+        '/api/receipts/import',
+        files={'file': ('old-mercadona.pdf', receipt_pdf, 'application/pdf')},
+    )
+    assert imported.status_code == 201
+    receipt_id = imported.json()['receipt_id']
+    engine = client.app.state.database_engine
+
+    # Emulate the earlier schema on an otherwise populated local database.
+    with engine.begin() as connection:
+        connection.exec_driver_sql('DROP INDEX IF EXISTS ix_receipt_store_reference')
+        connection.exec_driver_sql('ALTER TABLE receipts DROP COLUMN subtotal')
+        connection.exec_driver_sql('ALTER TABLE receipts DROP COLUMN reference')
+        connection.exec_driver_sql('ALTER TABLE receipt_items DROP COLUMN gross_total_price')
+        connection.exec_driver_sql('ALTER TABLE receipt_items DROP COLUMN discount_amount')
+
+    initialise_database(engine)
+    assert {'subtotal', 'reference'}.issubset(
+        {column['name'] for column in inspect(engine).get_columns('receipts')}
+    )
+    assert {'gross_total_price', 'discount_amount'}.issubset(
+        {column['name'] for column in inspect(engine).get_columns('receipt_items')}
+    )
+    stored = client.get(f'/api/receipts/{receipt_id}')
+    assert stored.status_code == 200
+    data = stored.json()
+    assert data['store'] == 'Mercadona'
+    assert data['total'] == '3.25'
+    assert len(data['items']) == 2
