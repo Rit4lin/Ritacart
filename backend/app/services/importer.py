@@ -96,6 +96,8 @@ class ReceiptImportService:
             try:
                 extracted_text = extract_text(pdf_bytes)
                 store_slug, parsed = self._parse_receipt(extracted_text)
+                if source_message_id is not None and store_slug != 'mercadona':
+                    raise ReceiptImportError('La importación por correo solo está permitida para Mercadona')
             except (PdfExtractionError, ValueError) as exc:
                 raise ReceiptImportError(str(exc)) from exc
 
