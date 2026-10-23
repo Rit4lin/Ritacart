@@ -17,9 +17,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from ..config import Settings
-from ..models import Product, ProductAlias, Receipt, ReceiptItem, ReceiptVat, Store
+from ..models import Product, ProductAlias, Receipt, ReceiptAdjustment, ReceiptItem, ReceiptVat, Store
 from ..parsers.base import ParsedReceipt, ParsedReceiptItem, ParsedReceiptVat
 from ..parsers.mercadona import MercadonaParser
+from ..parsers.carrefour import CarrefourParser
 from .pdf import PdfExtractionError, extract_text
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,8 @@ class ReceiptImportService:
     def __init__(self, settings: Settings, session_factory: sessionmaker[Session]) -> None:
         self.settings = settings
         self.session_factory = session_factory
-        self.parser = MercadonaParser()
+        self.parsers = {'mercadona': MercadonaParser(), 'carrefour': CarrefourParser()}
+        self.parser = self.parsers['mercadona']  # keep existing integrations compatible
         self._status = ImportStatus(enabled=settings.email_enabled)
         self._status_lock = threading.Lock()
 
@@ -93,20 +95,31 @@ class ReceiptImportService:
 
             try:
                 extracted_text = extract_text(pdf_bytes)
-                parsed = self.parser.parse(extracted_text)
+                store_slug, parsed = self._parse_receipt(extracted_text)
             except (PdfExtractionError, ValueError) as exc:
                 raise ReceiptImportError(str(exc)) from exc
 
-            semantic_duplicate = self._find_semantic_duplicate(session, parsed)
+            if parsed.reference:
+                existing = session.scalar(
+                    select(Receipt).join(Receipt.store).where(
+                        Store.slug == store_slug, Receipt.reference == parsed.reference
+                    )
+                )
+                if existing:
+                    return self._duplicate_result(session, existing)
+
+            semantic_duplicate = self._find_semantic_duplicate(session, parsed, store_slug)
             if semantic_duplicate is not None:
                 return self._duplicate_result(session, semantic_duplicate)
 
             pdf_path = self._save_pdf(pdf_bytes, file_hash)
-            store = self._get_or_create_store(session)
+            store = self._get_or_create_store(session, store_slug)
             receipt = Receipt(
                 store=store,
                 purchased_at=parsed.purchased_at,
                 total=parsed.total,
+                subtotal=parsed.subtotal,
+                reference=parsed.reference,
                 source_message_id=source_message_id,
                 source_attachment_index=source_attachment_index,
                 source_filename=self._display_filename(source_filename),
@@ -119,6 +132,7 @@ class ReceiptImportService:
             for item in parsed.items:
                 self._append_item(session, receipt, store, item)
             self._append_vat_breakdown(receipt, parsed.vat_breakdown)
+            self._append_adjustments(receipt, parsed.adjustments)
             try:
                 session.commit()
             except IntegrityError:
@@ -126,6 +140,14 @@ class ReceiptImportService:
                 existing = session.scalar(select(Receipt).where(Receipt.source_file_hash == file_hash))
                 if existing:
                     return self._duplicate_result(session, existing)
+                if parsed.reference:
+                    existing = session.scalar(
+                        select(Receipt).join(Receipt.store).where(
+                            Store.slug == store_slug, Receipt.reference == parsed.reference
+                        )
+                    )
+                    if existing:
+                        return self._duplicate_result(session, existing)
                 raise
             session.refresh(receipt)
             return ImportResult(
@@ -149,7 +171,10 @@ class ReceiptImportService:
                     raise ReceiptImportError(
                         "El ticket no conserva ni el PDF original ni texto extraído para reprocesarlo"
                     )
-                parsed = self.parser.parse(extracted_text)
+                parser = self.parsers.get(receipt.store.slug)
+                if parser is None:
+                    raise ReceiptImportError('Supermercado no compatible con el reprocesamiento')
+                parsed = parser.parse(extracted_text)
             except (OSError, PdfExtractionError, ValueError) as exc:
                 if isinstance(exc, ReceiptImportError):
                     raise
@@ -258,6 +283,7 @@ class ReceiptImportService:
         self,
         session: Session,
         parsed: ParsedReceipt,
+        store_slug: str,
     ) -> Receipt | None:
         """Find the same purchase even when a new OCR pass changes the PDF bytes."""
         candidates = session.scalars(
@@ -265,7 +291,7 @@ class ReceiptImportService:
             .join(Receipt.store)
             .options(selectinload(Receipt.items))
             .where(
-                Store.slug == "mercadona",
+                Store.slug == store_slug,
                 Receipt.purchased_at == parsed.purchased_at,
                 Receipt.total == parsed.total,
             )
@@ -316,13 +342,26 @@ class ReceiptImportService:
         )
 
     @staticmethod
-    def _get_or_create_store(session: Session) -> Store:
-        store = session.scalar(select(Store).where(Store.slug == "mercadona"))
+    def _get_or_create_store(session: Session, slug: str = 'mercadona') -> Store:
+        names = {'mercadona': 'Mercadona', 'carrefour': 'Carrefour'}
+        if slug not in names:
+            raise ReceiptImportError('Supermercado no compatible')
+        store = session.scalar(select(Store).where(Store.slug == slug))
         if store is None:
-            store = Store(name="Mercadona", slug="mercadona")
+            store = Store(name=names[slug], slug=slug)
             session.add(store)
             session.flush()
         return store
+
+    def _parse_receipt(self, extracted_text: str) -> tuple[str, ParsedReceipt]:
+        header = extracted_text.splitlines()[:10]
+        if any('CENTROS COMERCIALES CARREFOUR' in line.upper() for line in header):
+            slug = 'carrefour'
+        elif any('MERCADONA' in line.upper() for line in header):
+            slug = 'mercadona'
+        else:
+            raise ReceiptImportError('PDF de supermercado no reconocido: solo Mercadona y Carrefour')
+        return slug, self.parsers[slug].parse(extracted_text)
 
     @staticmethod
     def _get_or_create_product(session: Session, store: Store, raw_name: str) -> Product:
@@ -359,6 +398,8 @@ class ReceiptImportService:
                 unit_price=item.unit_price,
                 price_per_kg=item.price_per_kg,
                 total_price=item.total_price,
+                gross_total_price=item.gross_total_price,
+                discount_amount=item.discount_amount,
                 raw_text=item.raw_text,
             )
         )
@@ -375,12 +416,22 @@ class ReceiptImportService:
                 )
             )
 
+    @staticmethod
+    def _append_adjustments(receipt: Receipt, adjustments: list) -> None:
+        for adjustment in adjustments:
+            receipt.adjustments.append(ReceiptAdjustment(
+                label=adjustment.label, amount=adjustment.amount, raw_text=adjustment.raw_text,
+            ))
+
     def _duplicate_result(self, session: Session, receipt: Receipt) -> ImportResult:
         if receipt.items or not receipt.source_extracted_text:
             return ImportResult(receipt.id, imported=False, duplicate=True, warnings=[])
 
         try:
-            parsed = self.parser.parse(receipt.source_extracted_text)
+            parser = self.parsers.get(receipt.store.slug)
+            if parser is None:
+                raise ReceiptImportError('Supermercado no compatible')
+            parsed = parser.parse(receipt.source_extracted_text)
         except ValueError as exc:
             logger.warning("Could not repair incomplete duplicate receipt %s: %s", receipt.id, exc)
             return ImportResult(
@@ -407,14 +458,18 @@ class ReceiptImportService:
     ) -> None:
         receipt.purchased_at = parsed.purchased_at
         receipt.total = parsed.total
+        receipt.subtotal = parsed.subtotal
+        receipt.reference = parsed.reference
         receipt.parser_warnings = json.dumps(parsed.warnings, ensure_ascii=False)
         receipt.items.clear()
         receipt.vat_breakdown.clear()
+        receipt.adjustments.clear()
         session.flush()
         store = receipt.store
         for item in parsed.items:
             self._append_item(session, receipt, store, item)
         self._append_vat_breakdown(receipt, parsed.vat_breakdown)
+        self._append_adjustments(receipt, parsed.adjustments)
 
     def _set_status(self, **values: object) -> None:
         with self._status_lock:
