@@ -272,3 +272,21 @@ NRF: TEST-DISCOUNT-REF
     assert 'TEST-DISCOUNT-REF' in receipts_csv
     assert client.post(f'/api/receipts/{receipt_id}/reprocess').status_code == 200
     assert client.get(f'/api/receipts/{receipt_id}').json()['line_discount_total'] == '2.03'
+
+
+def test_headerless_legacy_mercadona_ocr_remains_importable(client):
+    # Before adding Carrefour, the Mercadona parser also handled cropped OCR tickets.
+    raw = """21/09/2026 13:33
+Cnt. Descripción P. Unit Importe
+1 BEBIDA VEGETAL
+1,50
+TOTAL (€)
+1,50
+"""
+    result = client.post('/api/receipts/import', files={
+        'file': ('old-cropped.pdf', make_pdf(raw), 'application/pdf')
+    })
+    assert result.status_code == 201, result.text
+    receipt = client.get(f"/api/receipts/{result.json()['receipt_id']}").json()
+    assert receipt['store'] == 'Mercadona'
+    assert receipt['total'] == '1.50'
