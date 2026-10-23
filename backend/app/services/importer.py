@@ -359,10 +359,10 @@ class ReceiptImportService:
         header = extracted_text.splitlines()[:10]
         if any('CENTROS COMERCIALES CARREFOUR' in line.upper() for line in header):
             slug = 'carrefour'
-        elif any('MERCADONA' in line.upper() for line in header):
-            slug = 'mercadona'
         else:
-            raise ReceiptImportError('PDF de supermercado no reconocido: solo Mercadona y Carrefour')
+            # Preserve the original behavior: existing Mercadona OCR/PDF tickets
+            # may have lost the store header, but can still be parsed correctly.
+            slug = 'mercadona'
         return slug, self.parsers[slug].parse(extracted_text)
 
     @staticmethod
