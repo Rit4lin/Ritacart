@@ -3,7 +3,7 @@ import { ChangeEvent, useEffect, useState } from 'react'
 type Page = 'inicio' | 'compras' | 'productos' | 'estadisticas' | 'habitos' | 'configuracion'
 type ImportStatus = { enabled: boolean; last_run: string | null; last_success: string | null; last_error: string | null; imported_receipts_last_run: number }
 type ReceiptSummary = { id: number; store: string; purchased_at: string; total: string; source_filename: string; source: 'email' | 'manual'; imported_at: string; item_count: number; needs_review: boolean }
-type ReceiptDetail = ReceiptSummary & { needs_review: boolean; parser_warnings: string[]; source_extracted_text: string; items: Array<{ id: number; raw_name: string; quantity: string | null; unit: string | null; unit_price: string | null; price_per_kg: string | null; total_price: string | null }>; vat_breakdown: Array<{ rate: string; taxable_base: string; tax_amount: string }> }
+type ReceiptDetail = ReceiptSummary & { subtotal: string | null; reference: string | null; line_discount_total: string; adjustments: Array<{ label: string; amount: string; raw_text: string }>; parser_warnings: string[]; source_extracted_text: string; items: Array<{ id: number; raw_name: string; quantity: string | null; unit: string | null; unit_price: string | null; price_per_kg: string | null; total_price: string | null; gross_total_price: string | null; discount_amount: string }>; vat_breakdown: Array<{ rate: string; taxable_base: string; tax_amount: string }> }
 type ProductSummary = { id: number; name: string; purchase_count: number; total_quantity: string; last_purchased_at: string | null; category: { id: number; name: string; slug: string } | null }
 type Category = { id: number; name: string; slug: string; product_count: number }
 type PriceSummary = { price_unit: string; current_price: string; previous_price: string | null; change_absolute: string | null; change_percent: string | null; min_price: string; max_price: string; average_price: string }
@@ -174,7 +174,7 @@ export default function App() {
   }
 
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><span>R</span><strong>RitaCart</strong></div><nav aria-label="Navegación principal">{([['inicio', 'Inicio'], ['compras', 'Compras'], ['productos', 'Productos'], ['estadisticas', 'Estadísticas'], ['habitos', 'Hábitos'], ['configuracion', 'Configuración']] as const).map(([id, label]) => <button className={page === id ? 'nav-item active' : 'nav-item'} key={id} onClick={() => setPage(id)}>{label}</button>)}</nav><p className="sidebar-note">Datos guardados localmente en tu instalación.</p></aside>
+    <aside className="sidebar"><div className="brand"><span>R</span><strong>RitaCart</strong></div><nav aria-label="Navegación principal">{([['inicio', 'Inicio'], ['compras', 'Compras'], ['productos', 'Productos'], ['estadisticas', 'Estadísticas'], ['habitos', 'Hábitos'], ['configuracion', 'Configuración']] as const).map(([id, label]) => <button className={page === id ? 'nav-item active' : 'nav-item'} key={id} onClick={() => setPage(id)}>{label}</button>)}</nav><p className="sidebar-note">RitaCart 2.0.0 · Datos locales.</p></aside>
     <main className="content"><section className="global-search"><label htmlFor="global-search">Buscar productos o tickets</label><input id="global-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Producto, alias, tienda o fecha" />{searchResults && <SearchPanel results={searchResults} onProduct={showProduct} onReceipt={showReceipt} />}</section>{message && <p className="notice" role="status">{message}</p>}{page === 'inicio' && <Home overview={overview} topProducts={topProducts} loading={loading} onShowReceipt={showReceipt} onShowProduct={showProduct} />}{page === 'compras' && <Purchases receipts={receipts} selected={selectedReceipt} onSelect={showReceipt} onUpload={uploadPdf} onReprocess={reprocessReceipt} />}{page === 'productos' && <Products products={products} categories={categories} selected={selectedProduct} onSelect={showProduct} onMerge={mergeProduct} onRename={renameProduct} onCategoryChange={setProductCategory} />}{page === 'estadisticas' && <Statistics data={statistics} insights={productInsights} categoryData={categoryAnalytics} range={statisticsRange} onRangeChange={setStatisticsRange} topProducts={topProducts} onShowProduct={showProduct} />}{page === 'habitos' && <Habits data={basketInsights} onShowProduct={showProduct} />}{page === 'configuracion' && <Configuration status={importStatus} health={dataHealth} onRun={runImport} />}</main>
   </div>
 }
@@ -191,13 +191,46 @@ function SearchPanel({ results, onProduct, onReceipt }: { results: SearchResults
 }
 
 function Purchases({ receipts, selected, onSelect, onUpload, onReprocess }: { receipts: ReceiptSummary[]; selected: ReceiptDetail | null; onSelect: (id: number) => void; onUpload: (event: ChangeEvent<HTMLInputElement>) => void; onReprocess: (id: number) => void }) {
-  return <><header className="page-heading"><div><p className="eyebrow">Historial</p><h1>Compras</h1></div><div className="upload-group"><label className="button upload">Importar PDF<input type="file" accept="application/pdf,.pdf" onChange={onUpload} /></label><small>Para tickets escaneados, aplica OCR en Adobe y guarda el PDF antes de subirlo.</small></div></header><div className="purchase-layout"><section className="card receipt-list">{receipts.length ? receipts.map((receipt) => <button className={selected?.id === receipt.id ? 'receipt-row selected' : 'receipt-row'} key={receipt.id} onClick={() => onSelect(receipt.id)}><span><strong>{formatMoney(receipt.total)}</strong><small>{formatDate(receipt.purchased_at)}</small></span><small>{receipt.source === 'manual' ? 'Manual' : 'Email'} · {receipt.item_count} productos{receipt.needs_review ? ' · Revisar' : ''}</small></button>) : <p className="empty">Importa un ticket PDF para empezar.</p>}</section><ReceiptDetailPanel receipt={selected} onReprocess={onReprocess} /></div></>
+  return <><header className="page-heading"><div><p className="eyebrow">Historial</p><h1>Compras</h1></div><div className="upload-group"><label className="button upload">Importar PDF<input type="file" accept="application/pdf,.pdf" onChange={onUpload} /></label><small>Para tickets escaneados, aplica OCR en Adobe y guarda el PDF antes de subirlo.</small></div></header><div className="purchase-layout"><section className="card receipt-list">{receipts.length ? receipts.map((receipt) => <button className={selected?.id === receipt.id ? 'receipt-row selected' : 'receipt-row'} key={receipt.id} onClick={() => onSelect(receipt.id)}><span><strong>{formatMoney(receipt.total)}</strong><small>{formatDate(receipt.purchased_at)}</small></span><small>{receipt.store} · {receipt.source === 'manual' ? 'Manual' : 'Email'} · {receipt.item_count} productos{receipt.needs_review ? ' · Revisar' : ''}</small></button>) : <p className="empty">Importa un ticket PDF para empezar.</p>}</section><ReceiptDetailPanel receipt={selected} onReprocess={onReprocess} /></div></>
 }
 
 function ReceiptDetailPanel({ receipt, onReprocess }: { receipt: ReceiptDetail | null; onReprocess: (id: number) => void }) {
   if (!receipt) return <section className="card detail empty">Selecciona un ticket para ver sus productos.</section>
   const vatTotal = receipt.vat_breakdown.reduce((total, vat) => total + Number(vat.tax_amount), 0)
-  return <section className="card detail"><div className="detail-title"><div><p className="eyebrow">{receipt.store}</p><h2>{formatMoney(receipt.total)}</h2><p>{formatDate(receipt.purchased_at)}</p></div><div className="detail-actions"><span>{receipt.item_count} productos</span><a className="receipt-pdf" href={`/api/receipts/${receipt.id}/pdf`} target="_blank" rel="noreferrer">Abrir ticket original</a><button onClick={() => { if (window.confirm('Se reconstruirán los datos normalizados del ticket desde el PDF original. ¿Continuar?')) onReprocess(receipt.id) }}>Reprocesar ticket</button></div></div>{receipt.needs_review && <section className="review-notice"><strong>Revisión recomendada</strong>{receipt.parser_warnings.length ? <ul>{receipt.parser_warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : <p>El ticket no contiene líneas de producto.</p>}</section>}{receipt.vat_breakdown.length > 0 && <section className="vat-summary"><strong>IVA incluido: {euro.format(vatTotal)}</strong>{receipt.vat_breakdown.map((vat) => <small key={vat.rate}>{vat.rate}%: base {formatMoney(vat.taxable_base)} · IVA {formatMoney(vat.tax_amount)}</small>)}</section>}<div className="item-table">{receipt.items.map((item) => <div className="item-row" key={item.id}><div><strong>{item.raw_name}</strong><small>{item.quantity ? `${item.quantity} ${item.unit ?? ''}` : 'Cantidad no indicada'}{item.price_per_kg ? ` · ${formatMoney(item.price_per_kg)}/kg` : ''}</small></div><strong>{item.total_price ? formatMoney(item.total_price) : '—'}</strong></div>)}</div><details className="technical-data"><summary>Datos técnicos: texto extraído</summary><pre>{receipt.source_extracted_text}</pre></details></section>
+  const lineDiscount = Number(receipt.line_discount_total || '0')
+  const hasBreakdown = receipt.subtotal !== null || receipt.adjustments.length > 0 || lineDiscount > 0
+  return <section className="card detail">
+    <div className="detail-title">
+      <div><p className="eyebrow">{receipt.store}</p><h2>{formatMoney(receipt.total)}</h2><p>{formatDate(receipt.purchased_at)}</p></div>
+      <div className="detail-actions">
+        <span>{receipt.item_count} productos</span>
+        <a className="receipt-pdf" href={'/api/receipts/' + receipt.id + '/pdf'} target="_blank" rel="noreferrer">Abrir ticket original</a>
+        <button onClick={() => { if (window.confirm('Se reconstruirán los datos normalizados del ticket desde el PDF original. ¿Continuar?')) onReprocess(receipt.id) }}>Reprocesar ticket</button>
+      </div>
+    </div>
+    {receipt.needs_review && <section className="review-notice"><strong>Revisión recomendada</strong>{receipt.parser_warnings.length ? <ul>{receipt.parser_warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : <p>El ticket no contiene líneas de producto.</p>}</section>}
+    {hasBreakdown && <section className="vat-summary" aria-label="Desglose de descuentos">
+      <strong>Desglose de la compra</strong>
+      {lineDiscount > 0 && <small>Descuentos de producto: −{euro.format(lineDiscount)}</small>}
+      {receipt.subtotal !== null && <small>Subtotal tras ofertas: {formatMoney(receipt.subtotal)}</small>}
+      {receipt.adjustments.map((adjustment, index) => <small key={index}>{adjustment.label}: {formatMoney(adjustment.amount)}</small>)}
+      <strong>Total pagado: {formatMoney(receipt.total)}</strong>
+    </section>}
+    {receipt.vat_breakdown.length > 0 && <section className="vat-summary">
+      <strong>IVA incluido: {euro.format(vatTotal)}</strong>
+      {receipt.vat_breakdown.map((vat) => <small key={vat.rate}>{vat.rate}%: base {formatMoney(vat.taxable_base)} · IVA {formatMoney(vat.tax_amount)}</small>)}
+    </section>}
+    <div className="item-table">{receipt.items.map((item) =>
+      <div className="item-row" key={item.id}>
+        <div><strong>{item.raw_name}</strong>
+          <small>{item.quantity ? (item.quantity + ' ' + (item.unit ?? '')) : 'Cantidad no indicada'}{item.price_per_kg ? (' · ' + formatMoney(item.price_per_kg) + '/kg') : ''}</small>
+          {Number(item.discount_amount) > 0 && <small>Oferta: −{formatMoney(item.discount_amount)} · Precio original: {item.gross_total_price ? formatMoney(item.gross_total_price) : '—'}</small>}
+        </div>
+        <strong>{item.total_price !== null ? formatMoney(item.total_price) : '—'}</strong>
+      </div>
+    )}</div>
+    <details className="technical-data"><summary>Datos técnicos: texto extraído</summary><pre>{receipt.source_extracted_text}</pre></details>
+  </section>
 }
 
 function Products({ products, categories, selected, onSelect, onMerge, onRename, onCategoryChange }: { products: ProductSummary[]; categories: Category[]; selected: ProductAnalytics | null; onSelect: (id: number) => void; onMerge: (sourceId: number, targetId: number) => void; onRename: (id: number, name: string) => void; onCategoryChange: (id: number, categoryId: number | null) => void }) {
