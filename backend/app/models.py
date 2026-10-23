@@ -42,6 +42,8 @@ class Receipt(Base):
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"), nullable=False)
     purchased_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    subtotal: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    reference: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     source_message_id: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     source_attachment_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     source_filename: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -56,6 +58,9 @@ class Receipt(Base):
         back_populates="receipt", cascade="all, delete-orphan"
     )
     vat_breakdown: Mapped[list[ReceiptVat]] = relationship(
+        back_populates="receipt", cascade="all, delete-orphan"
+    )
+    adjustments: Mapped[list[ReceiptAdjustment]] = relationship(
         back_populates="receipt", cascade="all, delete-orphan"
     )
 
@@ -97,6 +102,8 @@ class ReceiptItem(Base):
     unit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
     price_per_kg: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
     total_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    gross_total_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    discount_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal('0.00'))
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     receipt: Mapped[Receipt] = relationship(back_populates="items")
@@ -115,3 +122,15 @@ class ReceiptVat(Base):
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     receipt: Mapped[Receipt] = relationship(back_populates="vat_breakdown")
+
+
+class ReceiptAdjustment(Base):
+    __tablename__ = 'receipt_adjustments'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    receipt_id: Mapped[int] = mapped_column(ForeignKey('receipts.id'), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    receipt: Mapped[Receipt] = relationship(back_populates='adjustments')
