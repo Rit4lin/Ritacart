@@ -5,7 +5,7 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.14-slim AS runtime
+FROM python:3.15-slim AS runtime
 ENV APP_DATA_DIR=/data \
     DATABASE_URL=sqlite:////data/ritacart.db \
     APP_TIMEZONE=Europe/Madrid \
