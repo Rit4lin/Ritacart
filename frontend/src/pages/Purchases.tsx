@@ -134,15 +134,17 @@ export function Purchases({
             </p>
           )}
         </section>
-        <ReceiptDetailPanel
-          receipt={
-            selected &&
-            visibleReceipts.some((receipt) => receipt.id === selected.id)
-              ? selected
-              : null
-          }
-          onReprocess={onReprocess}
-        />
+        <div>
+          {selected &&
+            state === "ready" &&
+            !visibleReceipts.some((receipt) => receipt.id === selected.id) && (
+              <p className="notice">
+                El ticket abierto no aparece en la lista con los filtros
+                actuales.
+              </p>
+            )}
+          <ReceiptDetailPanel receipt={selected} onReprocess={onReprocess} />
+        </div>
       </div>
     </>
   );
