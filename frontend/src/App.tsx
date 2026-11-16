@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from "react";
+import { version } from "../package.json";
 import type {
   Page,
   ImportStatus,
@@ -469,7 +470,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <p className="sidebar-note">RitaCart 2.0.0 · Datos locales.</p>
+        <p className="sidebar-note">RitaCart {version} · Datos locales.</p>
       </aside>
       <main className="content" id="main-content" tabIndex={-1}>
         <section className="global-search">
