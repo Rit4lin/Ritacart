@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.0
+
+- Rediseño responsive de la interfaz y sistema visual documentado.
+- Navegación de análisis separada en gastos, categorías, precios y hábitos.
+- Filtros para el historial y mejoras de accesibilidad, mensajes y confirmaciones.
+- Frontend organizado en páginas y componentes reutilizables.
+- Mantiene los endpoints, parsers, base SQLite y montaje persistente `/data` de la versión 2.0.0.
+
+La imagen candidata se construye en la comprobación de la PR. El arranque con una copia de `/data` y los recorridos manuales descritos en `docs/UI_VERIFICATION.md` siguen pendientes; la fusión en `main` activa el flujo de publicación existente.
+
 ## 2.0.0 (23 de octubre de 2026)
 
 **Nueva compatibilidad:** tickets PDF de Carrefour, importados solo manualmente desde la pantalla Compras. Los tickets Mercadona mantienen su importación por IMAP y manual.

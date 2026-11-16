@@ -1,4 +1,4 @@
-# RitaCart 2.0.0
+# RitaCart 3.0.0
 
 RitaCart analiza automáticamente los tickets digitales del supermercado para convertirlos en un historial útil de compras, productos y precios.
 
@@ -55,11 +55,17 @@ Algunos artículos de fruta o granel solo presentan un importe en el ticket, sin
 
 Solo se han verificado directamente los formatos de los tickets Carrefour de **6 y 22 de octubre de 2026**. Otros modelos de Carrefour pueden requerir extender el parser. La subida de PDF sigue limitada a 20 MB y 20 páginas.
 
-## Actualización a 2.0.0
+## Actualización a 3.0.0
+
+La versión 3.0.0 renueva la interfaz y mantiene el backend y el formato de datos de la versión 2.0.0. Antes de actualizar, detén RitaCart y guarda una copia completa de `/data`, incluidos la base SQLite, los posibles archivos WAL/SHM y los PDF. No ejecutes dos versiones simultáneamente sobre el mismo volumen.
+
+Una vez publicada la imagen, en Unraid selecciona **Docker → Check for Updates** y recrea el contenedor conservando la misma ruta persistente `/data`. Si la plantilla utiliza `:latest`, no necesitas cambiar la etiqueta; si usa `:v2.0.0`, cambia a `ghcr.io/rit4lin/ritacart:v3.0.0` después de la publicación. Comprueba que el historial y los PDF siguen disponibles. La construcción de la imagen se ha verificado en CI; el arranque con una copia del volumen existente sigue pendiente de revisión.
+
+## Actualización anterior a 2.0.0
 
 El esquema SQLite se amplía automáticamente al arrancar, manteniendo los tickets de Mercadona existentes. Antes de actualizar el contenedor, haz una copia de seguridad del directorio persistente `/data`, incluyendo la base SQLite y posibles archivos WAL/SHM. No mezcles procesos ejecutando simultáneamente las versiones antigua y nueva sobre el mismo volumen.
 
-**Publicación:** RitaCart 2.0.0 se distribuye mediante `ghcr.io/rit4lin/ritacart:latest` y la etiqueta fija `ghcr.io/rit4lin/ritacart:v2.0.0`. Una vez publicada la imagen, en Unraid selecciona **Docker → Check for Updates**, descarga la actualización y recrea el contenedor **conservando la misma ruta persistente `/data`**. Si tu plantilla utiliza una etiqueta fija anterior, cambia el repositorio a `ghcr.io/rit4lin/ritacart:v2.0.0` para instalarla; con `:latest`, no cambies la plantilla. Comprueba en la aplicación que la versión es 2.0.0 y que el histórico de Mercadona continúa disponible.
+La etiqueta fija de aquella versión es `ghcr.io/rit4lin/ritacart:v2.0.0`.
 
 ## Gmail
 
@@ -122,3 +128,5 @@ RitaCart está diseñada para utilizarse dentro de una red privada y actualmente
 ## Desarrollo
 
 La documentación técnica y las decisiones de arquitectura están en [`docs/architecture.md`](docs/architecture.md).
+
+El sistema visual y los criterios de interfaz están documentados en [`docs/UI_GUIDELINES.md`](docs/UI_GUIDELINES.md); los límites de la revisión del rediseño se recogen en [`docs/UI_VERIFICATION.md`](docs/UI_VERIFICATION.md).
