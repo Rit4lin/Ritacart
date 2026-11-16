@@ -122,3 +122,5 @@ RitaCart está diseñada para utilizarse dentro de una red privada y actualmente
 ## Desarrollo
 
 La documentación técnica y las decisiones de arquitectura están en [`docs/architecture.md`](docs/architecture.md).
+
+El sistema visual y los criterios de interfaz están documentados en [`docs/UI_GUIDELINES.md`](docs/UI_GUIDELINES.md); los límites de la revisión del rediseño se recogen en [`docs/UI_VERIFICATION.md`](docs/UI_VERIFICATION.md).
